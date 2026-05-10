@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+#app{width:100%;height:100vh;min-height:500px;background:#050608;display:flex;flex-direction:column;font-family:monospace;overflow:hidden;}
+#topbar{
+  height:42px;flex-shrink:0;
+  background:#0d0d18;
+  border-bottom:1px solid rgba(0,255,180,0.15);
+  display:flex;align-items:center;gap:6px;padding:0 10px;
+}
+#topbar .logo{color:rgba(0,255,180,0.9);font-size:13px;font-weight:bold;letter-spacing:.1em;margin-right:10px;}
+.tb-btn{
+  background:rgba(0,255,180,0.07);border:1px solid rgba(0,255,180,0.2);
+  color:rgba(0,255,180,0.75);font-size:12px;padding:4px 12px;cursor:pointer;
+  border-radius:3px;letter-spacing:.05em;transition:all .15s;white-space:nowrap;
+}
+.tb-btn:hover{background:rgba(0,255,180,0.15);border-color:rgba(0,255,180,0.5);}
+.tb-sep{width:1px;height:22px;background:rgba(0,255,180,0.12);margin:0 4px;}
+#main{display:flex;flex:1;overflow:hidden;}
+#sidebar{
+  width:130px;flex-shrink:0;
+  background:#0b0b16;
+  border-right:1px solid rgba(0,255,180,0.12);
+  display:flex;flex-direction:column;gap:4px;padding:8px 6px;
+  overflow-y:auto;
+}
+.tool-btn{
+  background:rgba(0,255,180,0.06);border:1px solid rgba(0,255,180,0.18);
+  color:rgba(0,255,180,0.8);font-size:13px;padding:7px 8px;cursor:pointer;
+  border-radius:3px;letter-spacing:.04em;transition:all .15s;text-align:left;
+  display:flex;align-items:center;gap:7px;
+}
+.tool-btn:hover{background:rgba(0,255,180,0.13);border-color:rgba(0,255,180,0.45);}
+.tool-btn.active{background:rgba(0,255,180,0.2);border-color:rgba(0,255,180,0.85);color:#00ffb4;}
+.sb-sep{height:1px;background:rgba(0,255,180,0.1);margin:3px 0;}
+.sb-label{color:rgba(0,255,180,0.4);font-size:11px;padding:4px 3px 1px;letter-spacing:.05em;}
+.sb-val{color:rgba(0,255,180,0.7);font-size:11px;text-align:right;}
+.sb-row{display:flex;justify-content:space-between;align-items:center;padding:0 2px;}
+
+#canvas-wrap{
+  flex:1; position:relative; overflow:hidden; 
+  background:#050608; /* Wichtig: Pures dunkles Schwarz für Multiply */
+}
+#canvas {
+  position: absolute; top: 0; left: 0;
+  z-index: 1;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  /* KEINE teuren CSS Drop-Shadows mehr hier! */
+}
+#plasma-canvas {
+  position: absolute; top: 0; left: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: multiply; /* Der Magie-Filter aus Nemadeo */
+  filter: blur(12px) saturate(1.8); /* Weiche Plasma-Kanten */
+  will-change: transform;
+}
+#statusbar{
+  position:absolute;bottom:0;left:0;right:0;height:22px;
+  background:rgba(8,8,13,0.85);border-top:1px solid rgba(0,255,180,0.08);
+  color:rgba(0,255,180,0.35);font-size:10px;letter-spacing:.04em;
+  display:flex;align-items:center;padding:0 8px;justify-content:space-between;
+  pointer-events:none;
+  z-index: 3;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  background: rgba(0, 255, 180, 0.1);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: rgba(0, 255, 180, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 255, 180, 0.5);
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="logo">NIRIN PAINT</span>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-new">⬜ Neu</button>
+    <button class="tb-btn" id="btn-save">💾 Speichern</button>
+    <button class="tb-btn" id="btn-load">📂 Laden</button>
+    <button class="tb-btn" id="btn-export">↗ PNG Export</button>
+    <div class="tb-sep"></div>
+    
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="color:rgba(0,255,180,0.5); font-size:10px; width:40px;">SIZE</span>
+      <input type="range" id="size-slider" min="1" max="25" step="0.05" value="5" style="width:140px;">
+      <span id="val-size" style="color:rgba(0,255,180,0.9); font-size:11px; width:30px;">25</span>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:8px; margin-left:10px;">
+      <span style="color:rgba(0,255,180,0.5); font-size:10px; width:60px;">ZOOM-FIX</span>
+      <input type="range" id="zoomfix-slider" min="0" max="100" step="1" value="50" style="width:100px;">
+      <span id="val-zoomfix" style="color:rgba(0,255,180,0.9); font-size:11px; width:30px;">50%</span>
+    </div>
+    
+    <button class="tb-btn" id="btn-undo">↩ Undo</button>
+    <button class="tb-btn" id="btn-redo">↪ Redo</button>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div class="sb-label">WERKZEUGE</div>
+      <button class="tool-btn active" data-tool="pen">✏ Stift</button>
+      <button class="tool-btn" data-tool="brush">◉ Pinsel</button>
+      <button class="tool-btn" data-tool="eraser">◻ Radier</button>
+      <div class="sb-sep"></div>
+      <button class="tool-btn" data-tool="rect">▭ Rechteck</button>
+      <button class="tool-btn" data-tool="circle">○ Kreis</button>
+      <div class="sb-sep"></div>
+      <div class="sb-label">ANSICHT</div>
+      <div class="sb-row"><span class="sb-label">Zoom</span><span class="sb-val" id="zoom-display">1.00x</span></div>
+      <button class="tool-btn" id="btn-reset-view" style="font-size:11px;">⌖ Reset View</button>
+      <div class="sb-sep"></div>
+      <button class="tool-btn" id="btn-clear" style="color:rgba(255,80,80,0.7);border-color:rgba(255,80,80,0.2);">⌫ Leeren</button>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="canvas"></canvas>
+      <canvas id="plasma-canvas"></canvas>
+      <div id="statusbar">
+        <span id="status-left">Bereit</span>
+        <span id="status-right">Chunks: 0 | Striche: 0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('canvas-wrap');
+const statusL=document.getElementById('status-left');
+const statusR=document.getElementById('status-right');
+const zoomDisp=document.getElementById('zoom-display');
+const sizeSlider = document.getElementById('size-slider');
+const zoomFixSlider = document.getElementById('zoomfix-slider');
+const sizeLabel = document.getElementById('val-size');
+const zoomFixLabel = document.getElementById('val-zoomfix');
+
+const offCanvas = document.createElement('canvas');
+const offCtx = offCanvas.getContext('2d');
+
+const plasmaCanvas = document.getElementById('plasma-canvas');
+const plasmaCtx = plasmaCanvas.getContext('2d');
+const pOff = document.createElement('canvas');
+const pOffCtx = pOff.getContext('2d');
+const P_SIZE = 128; 
+pOff.width = P_SIZE;
+pOff.height = P_SIZE;
+let plasmaT = 0;
+
+const CHUNK=1000;
+
+const state = {
+  tool: 'pen',
+  size: 25,     
+  zoomFix: 50,
+  zoom: 1, 
+  panX: 0, 
+  panY: 0,
+  
+  // NEU: Eigene Koordinaten nur für das Plasma-Scrollen.
+  // Das verhindert den Farb-Sprung beim Zoomen!
+  plasmaPanX: 0, 
+  plasmaPanY: 0,
+
+  drawing: false, 
+  currentStroke: null,
+  strokes: [], 
+  redoStack: [],
+  shiftDown: false, 
+  spaceDown: false,
+  panning: false, 
+  lastPX: 0, 
+  lastPY: 0,
+  mouseX: 0, 
+  mouseY: 0,
+};
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth; 
+  const h = wrap.clientHeight;
+  
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  
+  offCanvas.width = w * dpr;
+  offCanvas.height = h * dpr;
+
+  plasmaCanvas.width = w * dpr;
+  plasmaCanvas.height = h * dpr;
+  plasmaCanvas.style.width = w + 'px';
+  plasmaCanvas.style.height = h + 'px';
+  
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+  offCtx.resetTransform();
+  offCtx.scale(dpr, dpr);
+  
+  render();
+}
+const ro=new ResizeObserver(resize);
+ro.observe(wrap);
+
+function s2w(sx,sy){
+  const wx=(sx-state.panX)/state.zoom;
+  const wy=(sy-state.panY)/state.zoom;
+  return{cx:Math.floor(wx/CHUNK),cy:Math.floor(wy/CHUNK),lx:wx-Math.floor(wx/CHUNK)*CHUNK,ly:wy-Math.floor(wy/CHUNK)*CHUNK};
+}
+function w2s(p){
+  const wx=p.cx*CHUNK+p.lx, wy=p.cy*CHUNK+p.ly;
+  return{sx:wx*state.zoom+state.panX, sy:wy*state.zoom+state.panY};
+}
+
+function calcWorldSize() {
+  const zFix = state.zoomFix / 100;
+  const effScreenSize = (state.size * state.zoom) * (1 - zFix) + (state.size) * zFix;
+  return effScreenSize / state.zoom;
+}
+
+function getRenderWidth(stroke) {
+  let multiplier = 0.7; 
+  if (stroke.tool === 'brush') multiplier = 2.5;
+  if (stroke.tool === 'eraser') multiplier = 3.0;
+
+  let ws = stroke.worldSize;
+  if (ws === undefined) {
+    const size = stroke.size || 5;
+    const zFix = (stroke.zoomFix !== undefined ? stroke.zoomFix : 50) / 100;
+    const eff = (size * state.zoom) * (1 - zFix) + size * zFix;
+    ws = eff / state.zoom;
+  }
+
+  const screenWidth = ws * state.zoom * multiplier;
+  return Math.max(0.5, screenWidth);
+}
+
+// Nemadeo Original Colors
+const C1 = [0, 255, 255]; // Cyan
+const C2 = [124, 255, 0]; // Lime
+const C3 = [255, 77, 255]; // Magenta
+
+function drawPlasmaTexture() {
+  const imgD = pOffCtx.createImageData(P_SIZE, P_SIZE);
+  const d = imgD.data;
+
+  for (let y = 0; y < P_SIZE; y++) {
+    for (let x = 0; x < P_SIZE; x++) {
+      const nx = x / P_SIZE, ny = y / P_SIZE;
+      const v = Math.sin(nx * 7 + plasmaT * 1.0) * 0.2
+              + Math.sin(ny * 5 - plasmaT * 0.7) * 0.2
+              + Math.sin((nx + ny) * 6 + plasmaT * 0.5) * 0.3
+              + Math.sin(Math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2) * 12 - plasmaT) * 0.3;
+      
+      const nv = (v + 1) / 2; 
+      let r, g, b;
+      
+      if (nv < 0.333) {
+          const t = nv / 0.333;
+          r = C1[0] + (C2[0] - C1[0]) * t;
+          g = C1[1] + (C2[1] - C1[1]) * t;
+          b = C1[2] + (C2[2] - C1[2]) * t;
+      } else if (nv < 0.666) {
+          const t = (nv - 0.333) / 0.333;
+          r = C2[0] + (C3[0] - C2[0]) * t;
+          g = C2[1] + (C3[1] - C2[1]) * t;
+          b = C2[2] + (C3[2] - C2[2]) * t;
+      } else {
+          const t = (nv - 0.666) / 0.334;
+          r = C3[0] + (C1[0] - C3[0]) * t;
+          g = C3[1] + (C1[1] - C3[1]) * t;
+          b = C3[2] + (C1[2] - C3[2]) * t;
+      }
+      
+      const idx = (y * P_SIZE + x) * 4;
+      d[idx] = r;
+      d[idx + 1] = g;
+      d[idx + 2] = b;
+      d[idx + 3] = 255;
+    }
+  }
+  pOffCtx.putImageData(imgD, 0, 0);
+}
+
+function composePlasma() {
+  const w = plasmaCanvas.width;
+  const h = plasmaCanvas.height;
+
+  plasmaCtx.clearRect(0, 0, w, h);
+
+  // Fülle mit Weiß. Multiply lässt Weiß komplett unsichtbar werden!
+  plasmaCtx.globalCompositeOperation = 'source-over';
+  plasmaCtx.fillStyle = '#ffffff'; 
+  plasmaCtx.fillRect(0, 0, w, h);
+  
+  // Das Plasma extrem vergrößern für max Performance
+  const tileW = Math.max(w, h); 
+  const dpr = window.devicePixelRatio || 1;
+
+  // Layer 1
+  plasmaCtx.globalAlpha = 0.5;
+  const offsetX = (state.plasmaPanX * 0.4 * dpr) % tileW;
+  const offsetY = (state.plasmaPanY * 0.4 * dpr) % tileW;
+  let sX = offsetX > 0 ? offsetX - tileW : offsetX;
+  let sY = offsetY > 0 ? offsetY - tileW : offsetY;
+  
+  plasmaCtx.drawImage(pOff, sX, sY, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX + tileW, sY, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX, sY + tileW, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX + tileW, sY + tileW, tileW, tileW);
+
+  // Layer 2
+  plasmaCtx.globalAlpha = 0.28;
+  const offX2 = (state.plasmaPanX * 0.25 * dpr) % tileW;
+  const offY2 = (state.plasmaPanY * 0.25 * dpr) % tileW;
+  let sX2 = offX2 > 0 ? offX2 - tileW : offX2;
+  let sY2 = offY2 > 0 ? offY2 - tileW : offY2;
+  
+  plasmaCtx.drawImage(pOff, sX2, sY2, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX2 + tileW, sY2, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX2, sY2 + tileW, tileW, tileW);
+  plasmaCtx.drawImage(pOff, sX2 + tileW, sY2 + tileW, tileW, tileW);
+}
+
+// Plasma Animation Loop läuft entkoppelt und stört das Malen nicht
+setInterval(() => {
+    plasmaT += 0.06;
+    drawPlasmaTexture();
+    composePlasma();
+}, 100);
+
+function render() {
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+
+  // Haupt-Canvas muss schwarz sein für den Multiply-Effekt!
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#050608';
+  ctx.fillRect(0, 0, w, h);
+  
+  drawGrid(w, h);
+
+  offCtx.save();
+  offCtx.setTransform(1, 0, 0, 1, 0, 0);
+  offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+  offCtx.restore();
+
+  for (const s of state.strokes) drawStroke(offCtx, s);
+  if (state.currentStroke) drawStroke(offCtx, state.currentStroke);
+
+  ctx.drawImage(offCanvas, 0, 0, w, h);
+
+  drawCursor();
+  updateStatus();
+}
+
+function drawGrid(w, h){
+  const gs=CHUNK*state.zoom;
+  const ox=((state.panX%gs)+gs)%gs;
+  const oy=((state.panY%gs)+gs)%gs;
+  ctx.strokeStyle='rgba(0,255,180,0.06)'; ctx.lineWidth=0.5;
+  for(let x=ox;x<w;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  for(let y=oy;y<h;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+}
+
+function drawStroke(targetCtx, stroke) {
+  if (!stroke.points || stroke.points.length === 0) return;
+  const pts = stroke.points.map(w2s);
+  const lineWidth = getRenderWidth(stroke);
+
+  targetCtx.save();
+  targetCtx.globalCompositeOperation = 'source-over';
+  targetCtx.globalAlpha = 1.0;
+
+  if (stroke.tool === 'brush') {
+    targetCtx.globalAlpha = 0.55;
+    targetCtx.strokeStyle = 'rgba(255,255,255,1)'; 
+  } else if (stroke.tool === 'eraser') {
+    targetCtx.globalCompositeOperation = 'destination-out';
+  } else {
+    // Pure weiße Farbe. Durch den Multiply Blend auf dem Plasma-Layer
+    // wird dieses Weiß zu purem Neon-Plasma!
+    targetCtx.strokeStyle = 'rgba(255,255,255,1)';
+  }
+
+  targetCtx.lineWidth = lineWidth;
+  targetCtx.lineCap = 'round'; 
+  targetCtx.lineJoin = 'round';
+
+  if (stroke.tool === 'rect' && pts.length === 2) {
+    targetCtx.beginPath();
+    targetCtx.strokeRect(pts[0].sx, pts[0].sy, pts[1].sx - pts[0].sx, pts[1].sy - pts[0].sy);
+  } else if (stroke.tool === 'circle' && pts.length === 2) {
+    const dx = pts[1].sx - pts[0].sx, dy = pts[1].sy - pts[0].sy;
+    targetCtx.beginPath(); 
+    targetCtx.arc(pts[0].sx, pts[0].sy, Math.sqrt(dx * dx + dy * dy), 0, Math.PI * 2); 
+    targetCtx.stroke();
+  } else {
+    if (pts.length === 1) {
+      targetCtx.beginPath(); 
+      targetCtx.arc(pts[0].sx, pts[0].sy, lineWidth * 0.5, 0, Math.PI * 2);
+      targetCtx.fillStyle = targetCtx.strokeStyle;
+      targetCtx.fill();
+    } else if (pts.length === 2) {
+      targetCtx.beginPath();
+      targetCtx.moveTo(pts[0].sx, pts[0].sy);
+      targetCtx.lineTo(pts[1].sx, pts[1].sy);
+      targetCtx.stroke();
+    } else {
+      targetCtx.beginPath(); 
+      targetCtx.moveTo(pts[0].sx, pts[0].sy);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i].sx + pts[i + 1].sx) / 2;
+        const my = (pts[i].sy + pts[i + 1].sy) / 2;
+        targetCtx.quadraticCurveTo(pts[i].sx, pts[i].sy, mx, my);
+      }
+      targetCtx.lineTo(pts[pts.length - 1].sx, pts[pts.length - 1].sy);
+      targetCtx.stroke();
+    }
+  }
+  targetCtx.restore();
+}
+
+function drawCursor() {
+  const x = state.mouseX, y = state.mouseY;
+  if (x < 0 || y < 0) return;
+  
+  const tempWorldSize = calcWorldSize();
+  const lineWidth = getRenderWidth({ tool: state.tool, worldSize: tempWorldSize });
+  const radius = lineWidth * 0.5;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0, 255, 180, 0.8)'; 
+  ctx.lineWidth = 1;
+  
+  if (radius > 1) {
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); 
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  
+  ctx.setLineDash([]);
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y);
+  ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function updateStatus(){
+  const wp=s2w(state.mouseX,state.mouseY);
+  statusL.textContent=`Chunk(${wp.cx},${wp.cy}) local(${wp.lx.toFixed(1)},${wp.ly.toFixed(1)})`;
+  const cs=new Set(state.strokes.flatMap(s=>s.points.map(p=>`${p.cx},${p.cy}`)));
+  statusR.textContent=`Chunks: ${cs.size} | Striche: ${state.strokes.length} | Zoom: ${state.zoom.toFixed(3)}x`;
+  zoomDisp.textContent=state.zoom.toFixed(2)+'x';
+}
+
+function getPos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.button === 1 || state.spaceDown) {
+    state.panning = true;
+    state.lastPX = e.clientX; state.lastPY = e.clientY;
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const p = getPos(e), wp = s2w(p.x, p.y);
+  state.drawing = true;
+  state.currentStroke = {
+    tool: state.tool,
+    worldSize: calcWorldSize(),
+    points: [wp]
+  };
+  state.redoStack = [];
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointermove',e=>{
+  const p=getPos(e);
+  state.mouseX=p.x; state.mouseY=p.y;
+  
+  if(state.panning){
+    const dx = e.clientX - state.lastPX;
+    const dy = e.clientY - state.lastPY;
+    
+    // Kamerabewegung aktualisieren
+    state.panX += dx; 
+    state.panY += dy;
+    
+    // Plasma-Bewegung aktualisieren (NUR beim Scrollen!)
+    state.plasmaPanX += dx;
+    state.plasmaPanY += dy;
+    
+    state.lastPX = e.clientX; 
+    state.lastPY = e.clientY;
+    
+    render();
+    composePlasma(); // Update sofort bei Drag
+    return;
+  }
+  
+  if(state.drawing && state.currentStroke){
+    const wp=s2w(p.x,p.y);
+    if(state.tool==='rect'||state.tool==='circle'){
+      state.currentStroke.points = [state.currentStroke.points[0], wp];
+    } else {
+      state.currentStroke.points.push(wp);
+    }
+  }
+  render();
+});
+
+canvas.addEventListener('pointerup',()=>{
+  state.panning=false;
+  if(state.drawing && state.currentStroke){
+    state.strokes.push(state.currentStroke);
+    state.currentStroke=null; state.drawing=false;
+    render();
+  }
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const p=getPos(e), f=e.deltaY<0?1.15:1/1.15;
+  const nz=Math.max(0.001, Math.min(1000, state.zoom*f));
+  
+  // Wichtig: Beim Zoomen ändert sich panX, um zur Maus zu zoomen.
+  // Wir verändern plasmaPanX hier ABSICHTLICH NICHT!
+  // Das stoppt das "Farb-Ändern" komplett.
+  state.panX=p.x-(p.x-state.panX)*(nz/state.zoom);
+  state.panY=p.y-(p.y-state.panY)*(nz/state.zoom);
+  state.zoom=nz;
+  
+  render();
+},{passive:false});
+
+sizeSlider.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  state.size = val * val; 
+  sizeLabel.textContent = Math.round(state.size);
+  render();
+});
+
+zoomFixSlider.addEventListener('input', (e) => {
+  state.zoomFix = parseInt(e.target.value);
+  zoomFixLabel.textContent = state.zoomFix + '%';
+  render();
+});
+
+function setTool(t){
+  state.tool=t;
+  document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+  render();
+}
+document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
+
+document.getElementById('btn-clear').addEventListener('click',()=>{state.strokes=[];render();});
+document.getElementById('btn-reset-view').addEventListener('click',()=>{
+  state.zoom=1; state.panX=0; state.panY=0; 
+  state.plasmaPanX=0; state.plasmaPanY=0; 
+  render(); composePlasma();
+});
+document.getElementById('btn-undo').addEventListener('click',()=>{if(state.strokes.length){state.redoStack.push(state.strokes.pop());render();}});
+document.getElementById('btn-redo').addEventListener('click',()=>{if(state.redoStack.length){state.strokes.push(state.redoStack.pop());render();}});
+
+canvas.style.cursor='none';
+resize();
+})();
+</script>
+</body>
+</html>
