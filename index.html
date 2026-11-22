@@ -1,398 +1,545 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>NIRIN PAINT 0.72</title>
 <style>
-/* CSS remains the same as in your v8 */
-*{margin:0;padding:0;box-sizing:border-box;}
-#app{width:100%;height:100vh;min-height:500px;background:#050608;display:flex;flex-direction:column;font-family:monospace;overflow:hidden;}
-#topbar{height:42px;flex-shrink:0;background:#0d0d18;border-bottom:1px solid rgba(0,255,180,0.15);display:flex;align-items:center;gap:6px;padding:0 10px;}
-#topbar .logo{color:rgba(0,255,180,0.9);font-size:13px;font-weight:bold;letter-spacing:.1em;margin-right:10px;}
-.tb-btn{background:rgba(0,255,180,0.07);border:1px solid rgba(0,255,180,0.2);color:rgba(0,255,180,0.75);font-size:12px;padding:4px 12px;cursor:pointer;border-radius:3px;letter-spacing:.05em;transition:all .15s;white-space:nowrap;}
-.tb-btn:hover{background:rgba(0,255,180,0.15);border-color:rgba(0,255,180,0.5);}
-.tb-sep{width:1px;height:22px;background:rgba(0,255,180,0.12);margin:0 4px;}
-#main{display:flex;flex:1;overflow:hidden;}
-#sidebar{width:130px;flex-shrink:0;background:#0b0b16;border-right:1px solid rgba(0,255,180,0.12);display:flex;flex-direction:column;gap:4px;padding:8px 6px;overflow-y:auto;}
-.tool-btn{background:rgba(0,255,180,0.06);border:1px solid rgba(0,255,180,0.18);color:rgba(0,255,180,0.8);font-size:13px;padding:7px 8px;cursor:pointer;border-radius:3px;letter-spacing:.04em;transition:all .15s;text-align:left;display:flex;align-items:center;gap:7px;}
-.tool-btn:hover{background:rgba(0,255,180,0.13);border-color:rgba(0,255,180,0.45);}
-.tool-btn.active{background:rgba(0,255,180,0.2);border-color:rgba(0,255,180,0.85);color:#00ffb4;}
-.sb-sep{height:1px;background:rgba(0,255,180,0.1);margin:3px 0;}
-.sb-label{color:rgba(0,255,180,0.4);font-size:11px;padding:4px 3px 1px;letter-spacing:.05em;}
-.sb-val{color:rgba(0,255,180,0.7);font-size:11px;text-align:right;}
-.sb-row{display:flex;justify-content:space-between;align-items:center;padding:0 2px;}
-#canvas-wrap{flex:1; position:relative; overflow:hidden; background:#050608;}
-#canvas {position: absolute; top: 0; left: 0; z-index: 2;}
-#plasma-canvas {position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; filter: blur(12px) saturate(1.8); will-change: transform;}
-#statusbar{position:absolute;bottom:0;left:0;right:0;height:22px;background:rgba(8,8,13,0.85);border-top:1px solid rgba(0,255,180,0.08);color:rgba(0,255,180,0.35);font-size:10px;letter-spacing:.04em;display:flex;align-items:center;padding:0 8px;justify-content:space-between;pointer-events:none;z-index: 3;}
-input[type=range] {-webkit-appearance: none; background: rgba(0, 255, 180, 0.1); height: 4px; border-radius: 2px; outline: none;}
-input[type=range]::-webkit-slider-thumb {-webkit-appearance: none; width: 12px; height: 12px; background: rgba(0, 255, 180, 0.9); border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0, 255, 180, 0.5);}
-</style>
-</head>
-<body>
-<div id="app">
-  <div id="topbar">
-    <span class="logo">NIRIN PAINT</span>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-new">⬜ Neu</button>
-    <button class="tb-btn" id="btn-save">💾 Speichern</button>
-    <button class="tb-btn" id="btn-load">📂 Laden</button>
-    <button class="tb-btn" id="btn-export">↗ PNG Export</button>
-    <div class="tb-sep"></div>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="color:rgba(0,255,180,0.5); font-size:10px; width:40px;">SIZE</span>
-      <input type="range" id="size-slider" min="1" max="25" step="0.05" value="5" style="width:140px;">
-      <span id="val-size" style="color:rgba(0,255,180,0.9); font-size:11px; width:30px;">25</span>
-    </div>
-    <div style="display:flex; align-items:center; gap:8px; margin-left:10px;">
-      <span style="color:rgba(0,255,180,0.5); font-size:10px; width:60px;">ZOOM-FIX</span>
-      <input type="range" id="zoomfix-slider" min="0" max="100" step="1" value="50" style="width:100px;">
-      <span id="val-zoomfix" style="color:rgba(0,255,180,0.9); font-size:11px; width:30px;">50%</span>
-    </div>
-    <button class="tb-btn" id="btn-undo">↩ Undo</button>
-    <button class="tb-btn" id="btn-redo">↪ Redo</button>
-  </div>
-  <div id="main">
-    <div id="sidebar">
-      <div class="sb-label">WERKZEUGE</div>
-      <button class="tool-btn active" data-tool="pen">✏ Stift</button>
-      <button class="tool-btn" data-tool="brush">◉ Pinsel</button>
-      <button class="tool-btn" data-tool="eraser">◻ Radier</button>
-      <div class="sb-sep"></div>
-      <button class="tool-btn" data-tool="rect">▭ Rechteck</button>
-      <button class="tool-btn" data-tool="circle">○ Kreis</button>
-      <div class="sb-sep"></div>
-      <div class="sb-label">ANSICHT</div>
-      <div class="sb-row"><span class="sb-label">Zoom</span><span class="sb-val" id="zoom-display">1.00x</span></div>
-      <button class="tool-btn" id="btn-reset-view" style="font-size:11px;">⌖ Reset View</button>
-      <div class="sb-sep"></div>
-      <button class="tool-btn" id="btn-clear" style="color:rgba(255,80,80,0.7);border-color:rgba(255,80,80,0.2);">⌫ Leeren</button>
-    </div>
-    <div id="canvas-wrap">
-      <canvas id="canvas"></canvas>
-      <canvas id="plasma-canvas"></canvas>
-      <div id="statusbar">
-        <span id="status-left">Bereit</span>
-        <span id="status-right">Chunks: 0 | Striche: 0</span>
-      </div>
-    </div>
-  </div>
-</div>
-
+:root{color-scheme:dark;--bg:#050608;--panel:#080e16;--panel2:#0e1923;--border:#244451;--txt:#d8eaf1;--mut:#86a0ab;--cyan:#00ffff;--lime:#7cff00;--pink:#ff4dff;font-family:system-ui,Segoe UI,Arial,sans-serif}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);overflow:hidden}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+#app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto}header{display:flex;gap:16px;align-items:center;background:var(--panel);padding:9px 15px;border-bottom:1px solid #24616d;min-height:64px;box-shadow:0 8px 24px #0008;z-index:3}.brand{display:flex;gap:10px;align-items:center;flex:none}.gem{width:38px;height:38px;display:grid;place-items:center;color:var(--cyan);border:1px solid #00ffff6d;border-radius:11px;background:linear-gradient(140deg,#07565c,#101125);box-shadow:0 0 26px #00ffff25;font-size:23px}.brand b{letter-spacing:.18em;font-size:14px}.brand small{display:block;color:var(--lime);font-size:9px;letter-spacing:.12em;margin-top:3px}.commands{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.btn{background:#0c1721;color:var(--txt);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:12px;white-space:nowrap}.btn:hover{background:#143441;border-color:var(--cyan)}.btn:disabled{opacity:.35;cursor:default}.btn.hot{color:#adfff5;border-color:#007d85;background:#053a40}.sep{height:28px;border-left:1px solid #284856;margin:0 4px}
+#workspace{display:grid;grid-template-columns:178px minmax(0,1fr) 210px;min-height:0}aside{min-height:0;overflow-y:auto;background:var(--panel);padding:12px 10px;scrollbar-color:#30616d transparent}aside.left{border-right:1px solid var(--border)}aside.right{border-left:1px solid var(--border)}.section{font-size:10px;letter-spacing:.16em;color:#8aa8b1;font-weight:800;text-transform:uppercase;margin:8px 5px 10px}.tool{width:100%;display:flex;align-items:center;gap:10px;color:#bad1d9;background:transparent;border:1px solid transparent;border-radius:8px;padding:11px 9px;text-align:left;font-size:13px;margin-bottom:3px}.tool:hover{background:#142631}.tool.active{border-color:#207f86;color:#ddffff;background:linear-gradient(90deg,#103e43,#111b2a);box-shadow:inset 3px 0 var(--cyan)}.glyph{font-size:18px;width:23px;text-align:center;color:var(--lime)}.tool.active .glyph{color:var(--cyan)}.hr{height:1px;background:#284651;margin:13px 2px}.field{margin:8px 5px 19px}.field label{font-size:12px;color:#bed1d9;display:flex;justify-content:space-between;margin-bottom:10px}.field input[type=range]{width:100%;accent-color:var(--cyan)}.value{color:var(--cyan);font:11px ui-monospace,Consolas,monospace}.hint{font-size:11px;color:var(--mut);line-height:1.65;margin:10px 5px}.stats{font:11px/1.9 ui-monospace,Consolas,monospace;color:#9cb7c2;overflow-wrap:anywhere}.stats strong{color:var(--lime)}.check{display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 4px}.check input{accent-color:var(--lime)}
+#stage{position:relative;overflow:hidden;background:#070b11;touch-action:none;cursor:crosshair;user-select:none}#stage.panning{cursor:grabbing}.layer{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}#plasma{filter:blur(12px) saturate(165%);opacity:.96}.edgefill{position:absolute;z-index:0;pointer-events:none;background:#070b11;display:none}#paint{z-index:1;touch-action:none;pointer-events:none;transform-origin:0 0;will-change:transform;image-rendering:auto}#gridLayer{z-index:2}#overlay{z-index:3}#trailLayer{z-index:4}#pointer{z-index:5}#pointer{position:absolute;z-index:5;pointer-events:none;border:1px dashed var(--cyan);box-shadow:0 0 12px #00ffff66;border-radius:50%;transform:translate(-10000px,-10000px)}.corner{position:absolute;z-index:2;top:13px;left:16px;pointer-events:none;font:10px ui-monospace,Consolas,monospace;letter-spacing:.1em;color:#96f9f2b4}.corner.right{right:16px;left:auto}.zoom-ui{z-index:4;position:absolute;right:16px;bottom:16px;display:flex;align-items:center;gap:5px;background:#081621e5;border:1px solid var(--border);padding:5px;border-radius:8px}.zoom-ui output{min-width:115px;color:var(--cyan);font:11px ui-monospace,Consolas,monospace;text-align:center}footer{background:#070c11;border-top:1px solid var(--border);display:flex;gap:15px;justify-content:space-between;padding:8px 14px;color:#87a8b4;font:11px ui-monospace,monospace;white-space:nowrap;overflow:hidden}footer b{color:var(--cyan);font-weight:500}#toast{position:fixed;z-index:10;bottom:50px;left:50%;transform:translateX(-50%);background:#0e2632;border:1px solid #008c98;color:#c8fff9;padding:12px 16px;border-radius:8px;box-shadow:0 15px 35px #000b;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:80vw}#toast.show{opacity:1}#meter{height:3px;position:absolute;top:0;left:0;right:0;background:#00ffff33;z-index:5;display:none;overflow:hidden}#meter::before{content:"";display:block;background:var(--cyan);width:30%;height:100%;animation:slide 1s linear infinite}@keyframes slide{from{transform:translateX(-110%)}to{transform:translateX(410%)}}#meter.active{display:block}
+@media(max-width:1100px){#workspace{grid-template-columns:150px minmax(0,1fr) 170px}header{gap:8px}.btn{padding:7px 8px}.brand small{display:none}}
+@media(max-width:800px){#workspace{grid-template-columns:55px minmax(0,1fr)}aside.left{padding:8px 4px}aside.right{display:none}.tool{justify-content:center;padding:11px 2px}.tool .name,.section,.hint{display:none}header{flex-wrap:wrap}.brand{margin-right:10px}}
+#screen{z-index:1;transform:none!important;will-change:auto}#plasma{display:none!important}#overlay{z-index:3}#trailLayer{z-index:4}#stage{background:#07111b}#statusLight{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7cff00;margin-right:6px;box-shadow:0 0 9px #7cff00}
+</style></head><body>
+<div id="app"><header><div class="brand"><div class="gem">✧</div><div><b>NIRIN PAINT</b><small>INFINIDRAW™ / ENGINE 2 · NROP EDITION</small></div></div><div class="commands"><button class="btn" id="new">◇ Neu</button><button class="btn" id="save">▣ Projekt</button><button class="btn" id="load">▤ Laden</button><button class="btn hot" id="export">↗ PNG Ansicht</button><span class="sep"></span><button class="btn" id="undo">↶ Undo</button><button class="btn" id="redo">↷ Redo</button><span class="sep"></span><button class="btn" id="reset">⌖ Ansicht</button></div></header>
+<div id="workspace"><aside class="left"><div class="section">Werkzeuge</div><button class="tool active" data-tool="pen" title="Stift (P)"><span class="glyph">✎</span><span class="name">Stift</span></button><button class="tool" data-tool="brush" title="Breiter Pinsel (B)"><span class="glyph">◉</span><span class="name">Pinsel</span></button><button class="tool" data-tool="eraser" title="Flächenradierer (E)"><span class="glyph">◇</span><span class="name">Radieren</span></button><button class="tool" data-tool="eraseRect" title="Rechteckige Radierung (X)"><span class="glyph">▦</span><span class="name">Rechteck-Radierer</span></button><div class="hr"></div><button class="tool" data-tool="rect" title="Rechteck (R)"><span class="glyph">▯</span><span class="name">Rechteck</span></button><button class="tool" data-tool="circle" title="Kreis (C)"><span class="glyph">◯</span><span class="name">Kreis</span></button><button class="tool" data-tool="hand" title="Pan (H / Space)"><span class="glyph">✥</span><span class="name">Verschieben</span></button><div class="hr"></div><button class="tool" id="clear"><span class="glyph">⌫</span><span class="name">Leeren</span></button><p class="hint">Kein Übermalen: Radierungen sind dauerhaft gespeicherte geometrische Aussparungen.</p></aside>
+<div id="stage"><div id="meter"></div><canvas class="layer" id="plasma"></canvas><canvas class="layer" id="screen" aria-label="Infinidraw-Zeichenfläche"></canvas><canvas class="layer" id="gridLayer" style="display:none"></canvas><canvas class="layer" id="overlay"></canvas><canvas class="layer" id="trailLayer"></canvas><div class="corner">NIRIN ∞ / NROP · TRANSACTIONAL SCENE</div><div class="corner right" id="cornerRight">ZOOM 2⁰</div><div id="pointer"></div><div class="zoom-ui"><button class="btn" id="zoomout">−</button><output id="zoomValue">2⁰</output><button class="btn" id="zoomin">+</button></div></div>
+<aside class="right"><div class="section">Werkzeug</div><div class="field"><label>Größe <span class="value" id="sizeValue">18 px</span></label><input type="range" id="size" min="1" max="96" step="1" value="18"></div><div class="section">Darstellung</div><label class="check"><input id="plasmaToggle" type="checkbox" checked> Bewegtes Plasma</label><label class="check"><input id="grid" type="checkbox" checked> Skalenraster</label><div class="hr"></div><div class="section">Engine</div><div id="stats" class="stats"></div><p class="hint">Dyadische BigInt-Koordinaten · GPU-Kamera · präzise Weltgeometrie · Masken-Worker · einheitliche Transaktionsvorschau.</p><div class="hr"></div><div class="section">Steuerung</div><p class="hint">Mausrad: Zoom am Zeiger<br>Space / mittlere Taste: Pan<br>Strg+Z / Strg+Y: Undo/Redo<br>Projekt als JSON speichern</p></aside></div><footer><span><b>●</b> NIRIN / <span id="footState">READY</span></span><span id="footCounts">0 Striche · 0 Aussparungen</span><span id="footPerf">Worker wartet</span></footer></div><div id="toast"></div><input type="file" id="file" accept=".json,application/json" hidden>
 <script>
-(function(){
-const canvas=document.getElementById('canvas');
-const ctx=canvas.getContext('2d');
-const wrap=document.getElementById('canvas-wrap');
-const statusL=document.getElementById('status-left');
-const statusR=document.getElementById('status-right');
-const zoomDisp=document.getElementById('zoom-display');
-const sizeSlider = document.getElementById('size-slider');
-const zoomFixSlider = document.getElementById('zoomfix-slider');
-const sizeLabel = document.getElementById('val-size');
-const zoomFixLabel = document.getElementById('val-zoomfix');
-
-const plasmaCanvas = document.getElementById('plasma-canvas');
-const plasmaCtx = plasmaCanvas.getContext('2d');
-const pOff = document.createElement('canvas');
-const pOffCtx = pOff.getContext('2d');
-const P_SIZE = 128; 
-pOff.width = P_SIZE;
-pOff.height = P_SIZE;
-let plasmaT = 0;
-
-const CHUNK=1000;
-
-// Internal baking canvas to solve the "performance zerficken" issue
-const bakedCanvas = document.createElement('canvas');
-const bakedCtx = bakedCanvas.getContext('2d');
-let needsFullRedraw = true;
-
-const state = {
-  tool: 'pen',
-  size: 25,     
-  zoomFix: 50,
-  zoom: 1, 
-  panX: 0, 
-  panY: 0,
-  plasmaPanX: 0, 
-  plasmaPanY: 0,
-  drawing: false, 
-  currentStroke: null,
-  strokes: [], 
-  redoStack: [],
-  shiftDown: false, 
-  spaceDown: false,
-  panning: false, 
-  lastPX: 0, 
-  lastPY: 0,
-  mouseX: 0, 
-  mouseY: 0,
-};
-
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  const w = wrap.clientWidth; 
-  const h = wrap.clientHeight;
-  
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  
-  bakedCanvas.width = w * dpr;
-  bakedCanvas.height = h * dpr;
-  
-  plasmaCanvas.width = w * dpr;
-  plasmaCanvas.height = h * dpr;
-  plasmaCanvas.style.width = w + 'px';
-  plasmaCanvas.style.height = h + 'px';
-  
-  ctx.resetTransform();
-  ctx.scale(dpr, dpr);
-  bakedCtx.resetTransform();
-  bakedCtx.scale(dpr, dpr);
-  
-  needsFullRedraw = true;
-  render();
-}
-const ro=new ResizeObserver(resize);
-ro.observe(wrap);
-
-function s2w(sx,sy){
-  const wx=(sx-state.panX)/state.zoom;
-  const wy=(sy-state.panY)/state.zoom;
-  return{cx:Math.floor(wx/CHUNK),cy:Math.floor(wy/CHUNK),lx:wx-Math.floor(wx/CHUNK)*CHUNK,ly:wy-Math.floor(wy/CHUNK)*CHUNK};
-}
-function w2s(p){
-  const wx=p.cx*CHUNK+p.lx, wy=p.cy*CHUNK+p.ly;
-  return{sx:wx*state.zoom+state.panX, sy:wy*state.zoom+state.panY};
-}
-
-function calcWorldSize() {
-  const zFix = state.zoomFix / 100;
-  const effScreenSize = (state.size * state.zoom) * (1 - zFix) + (state.size) * zFix;
-  return effScreenSize / state.zoom;
-}
-
-function getRenderWidth(stroke) {
-  let multiplier = 0.7; 
-  if (stroke.tool === 'brush') multiplier = 2.5;
-  if (stroke.tool === 'eraser') multiplier = 3.0;
-  let ws = stroke.worldSize || (stroke.size / state.zoom); // Fallback for old saves
-  const screenWidth = ws * state.zoom * multiplier;
-  return Math.max(0.5, screenWidth);
-}
-
-const C1 = [0, 255, 255]; 
-const C2 = [124, 255, 0]; 
-const C3 = [255, 77, 255];
-
-function drawPlasmaTexture() {
-  const imgD = pOffCtx.createImageData(P_SIZE, P_SIZE);
-  const d = imgD.data;
-  for (let y = 0; y < P_SIZE; y++) {
-    for (let x = 0; x < P_SIZE; x++) {
-      const nx = x / P_SIZE, ny = y / P_SIZE;
-      const v = Math.sin(nx * 7 + plasmaT * 1.0) * 0.2 + Math.sin(ny * 5 - plasmaT * 0.7) * 0.2 + Math.sin((nx + ny) * 6 + plasmaT * 0.5) * 0.3 + Math.sin(Math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2) * 12 - plasmaT) * 0.3;
-      const nv = (v + 1) / 2; 
-      let r, g, b;
-      if (nv < 0.333) { const t = nv / 0.333; r = C1[0] + (C2[0] - C1[0]) * t; g = C1[1] + (C2[1] - C1[1]) * t; b = C1[2] + (C2[2] - C1[2]) * t; }
-      else if (nv < 0.666) { const t = (nv - 0.333) / 0.333; r = C2[0] + (C3[0] - C2[0]) * t; g = C2[1] + (C3[1] - C2[1]) * t; b = C2[2] + (C3[2] - C2[2]) * t; }
-      else { const t = (nv - 0.666) / 0.334; r = C3[0] + (C1[0] - C3[0]) * t; g = C3[1] + (C1[1] - C3[1]) * t; b = C3[2] + (C1[2] - C3[2]) * t; }
-      const idx = (y * P_SIZE + x) * 4;
-      d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = 255;
-    }
+'use strict';
+// INFINIDRAW 2 · Smooth: dyadic numbers x = n * 2^e. The exponent is not artificially bounded.
+// Canonicalization means regions 2^500 apart need not drag 500 bits into every value.
+function GeometryCore(){
+ const ZERO={n:0n,e:0};
+ function d(n,e=0){n=BigInt(n);if(n===0n)return ZERO;if(!Number.isSafeInteger(e))throw Error('Exponentenbereich des Browsers erschöpft');while((n&1n)===0n){n>>=1n;e++;}return{n,e};}
+ function add(a,b){if(a.n===0n)return b;if(b.n===0n)return a;const e=Math.min(a.e,b.e);return d((a.n<<BigInt(a.e-e))+(b.n<<BigInt(b.e-e)),e);}
+ function neg(a){return{n:-a.n,e:a.e};}function sub(a,b){return add(a,neg(b));}
+ function mul(a,b){return d(a.n*b.n,a.e+b.e);}
+ function cmp(a,b){if(a.n===0n&&b.n===0n)return 0;const e=Math.min(a.e,b.e);const x=a.n<<BigInt(a.e-e),y=b.n<<BigInt(b.e-e);return x<y?-1:x>y?1:0;}
+ function min(a,b){return cmp(a,b)<=0?a:b;}function max(a,b){return cmp(a,b)>=0?a:b;}function abs(a){return a.n<0n?neg(a):a;}
+ function fromPx(px,level=0){if(!Number.isFinite(px)||!Number.isSafeInteger(level))throw Error('Unzulässige Bildschirmkoordinate');return d(BigInt(Math.round(px*4096)),-12-level);}
+ function approx(a,level=0){if(a.n===0n)return 0;const bits=(a.n<0n?-a.n:a.n).toString(2).length;const shift=Math.max(0,bits-48);const head=Number(a.n>>BigInt(shift));const v=head*Math.pow(2,a.e+level+shift);return Number.isFinite(v)?v:(a.n<0n?-Infinity:Infinity);}
+ function unitPoint(x,y){return{x,y};}
+ function bounds(points,pad=ZERO){let x0=points[0].x,x1=x0,y0=points[0].y,y1=y0;for(const p of points){x0=min(x0,p.x);x1=max(x1,p.x);y0=min(y0,p.y);y1=max(y1,p.y);}return{x0:sub(x0,pad),x1:add(x1,pad),y0:sub(y0,pad),y1:add(y1,pad)};}
+ function overlap(a,b){return cmp(a.x0,b.x1)<=0&&cmp(a.x1,b.x0)>=0&&cmp(a.y0,b.y1)<=0&&cmp(a.y1,b.y0)>=0;}
+ function join(a,b){return{x0:min(a.x0,b.x0),x1:max(a.x1,b.x1),y0:min(a.y0,b.y0),y1:max(a.y1,b.y1)};}
+ function boxArea(p,q){return{x0:min(p.x,q.x),x1:max(p.x,q.x),y0:min(p.y,q.y),y1:max(p.y,q.y)};}
+ function asInt(a,e){return a.n<<BigInt(a.e-e);}
+ function capsuleHit(center,a,b,r,pad){
+  const e=Math.min(center.x.e,center.y.e,a.x.e,a.y.e,b.x.e,b.y.e,r.e,pad.e);
+  const x=asInt(center.x,e),y=asInt(center.y,e),ax=asInt(a.x,e),ay=asInt(a.y,e),bx=asInt(b.x,e),by=asInt(b.y,e),R=asInt(r,e),P=asInt(pad,e);
+  const dx=bx-ax,dy=by-ay,wx=x-ax,wy=y-ay,rrPlus=(R+P)*(R+P),rrMinus=R>P?(R-P)*(R-P):-1n;
+  function inside(sqThreshold){if(sqThreshold<0n)return false;const len=dx*dx+dy*dy,dot=wx*dx+wy*dy;if(len===0n||dot<=0n)return wx*wx+wy*wy<=sqThreshold;if(dot>=len){const u=x-bx,v=y-by;return u*u+v*v<=sqThreshold;}const cross=wx*dy-wy*dx;return cross*cross<=sqThreshold*len;}
+  if(rrMinus>=0n&&inside(rrMinus))return 1;return inside(rrPlus)?2:0;
+ }
+ function diskRingHit(center,c,r,half,pad){
+  const e=Math.min(center.x.e,center.y.e,c.x.e,c.y.e,r.e,half.e,pad.e),x=asInt(center.x,e)-asInt(c.x,e),y=asInt(center.y,e)-asInt(c.y,e),D=x*x+y*y,R=asInt(r,e),H=asInt(half,e),P=asInt(pad,e);
+  const inner=R>H?R-H:0n,outer=R+H;
+  if(D>(outer+P)*(outer+P))return 0;
+  if(inner>P&&D<(inner-P)*(inner-P))return 0;
+  if(outer>P&&D<=(outer-P)*(outer-P)&&D>=(inner+P)*(inner+P))return 1;
+  return 2;
+ }
+ function rectHit(center,box,pad){const a=add(center.x,pad),b=sub(center.x,pad),c=add(center.y,pad),h=sub(center.y,pad);if(cmp(a,box.x0)<0||cmp(b,box.x1)>0||cmp(c,box.y0)<0||cmp(h,box.y1)>0)return 0;if(cmp(b,box.x0)>=0&&cmp(a,box.x1)<=0&&cmp(h,box.y0)>=0&&cmp(c,box.y1)<=0)return 1;return 2;}
+ function classify(g,p,pad){
+  if(g.shape==='eraseRect')return rectHit(p,g.b,pad);
+  if(g.shape==='circle')return diskRingHit(p,g.p[0],g.radius,g.half,pad);
+  let undecided=false;const pts=g.p;
+  for(let i=0;i<Math.max(1,pts.length-1);i++){
+   const a=pts[i],b=pts[Math.min(i+1,pts.length-1)],h=capsuleHit(p,a,b,g.half,pad);
+   if(h===1)return 1;if(h===2)undecided=true;
   }
-  pOffCtx.putImageData(imgD, 0, 0);
+  return undecided?2:0;
+ }
+ function classifyExact(g,p){return classify(g,p,ZERO)===1;}
+ function toJSON(v){return JSON.stringify(v,(_k,x)=>typeof x==='bigint'?`b:${x}`:x);}
+ function fromJSON(text){return JSON.parse(text,(_k,x)=>typeof x==='string'&&/^(?:b|bi):-?\d+$/.test(x)?BigInt(x.slice(x.indexOf(':')+1)):x);}
+ return{ZERO,d,add,sub,mul,cmp,min,max,abs,fromPx,approx,bounds,overlap,join,boxArea,classify,classifyExact,toJSON,fromJSON};
 }
-
-function composePlasma() {
-  const w = plasmaCanvas.width, h = plasmaCanvas.height;
-  plasmaCtx.clearRect(0, 0, w, h);
-  plasmaCtx.globalCompositeOperation = 'source-over';
-  plasmaCtx.fillStyle = '#ffffff'; 
-  plasmaCtx.fillRect(0, 0, w, h);
-  const tileW = Math.max(w, h), dpr = window.devicePixelRatio || 1;
-  plasmaCtx.globalAlpha = 0.5;
-  const offsetX = (state.plasmaPanX * 0.4 * dpr) % tileW, offsetY = (state.plasmaPanY * 0.4 * dpr) % tileW;
-  let sX = offsetX > 0 ? offsetX - tileW : offsetX, sY = offsetY > 0 ? offsetY - tileW : offsetY;
-  plasmaCtx.drawImage(pOff, sX, sY, tileW, tileW); plasmaCtx.drawImage(pOff, sX + tileW, sY, tileW, tileW); plasmaCtx.drawImage(pOff, sX, sY + tileW, tileW, tileW); plasmaCtx.drawImage(pOff, sX + tileW, sY + tileW, tileW, tileW);
-  plasmaCtx.globalAlpha = 0.28;
-  const offX2 = (state.plasmaPanX * 0.25 * dpr) % tileW, offY2 = (state.plasmaPanY * 0.25 * dpr) % tileW;
-  let sX2 = offX2 > 0 ? offX2 - tileW : offX2, sY2 = offY2 > 0 ? offY2 - tileW : offY2;
-  plasmaCtx.drawImage(pOff, sX2, sY2, tileW, tileW); plasmaCtx.drawImage(pOff, sX2 + tileW, sY2, tileW, tileW); plasmaCtx.drawImage(pOff, sX2, sY2 + tileW, tileW, tileW); plasmaCtx.drawImage(pOff, sX2 + tileW, sY2 + tileW, tileW, tileW);
-}
-
-setInterval(() => { plasmaT += 0.06; drawPlasmaTexture(); composePlasma(); }, 100);
-
-function render() {
-const w = wrap.clientWidth, h = wrap.clientHeight;
-  
-  if (needsFullRedraw) {
-    bakedCtx.globalCompositeOperation = 'source-over';
-    bakedCtx.fillStyle = '#050608';
-    bakedCtx.fillRect(0, 0, w, h);
-    
-    // Grid drawing removed here to fix performance and visual artifacts
-    
-    for (const s of state.strokes) drawStroke(bakedCtx, s);
-    needsFullRedraw = false;
-  }
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(bakedCanvas, 0, 0, w, h);
-  
-  if (state.currentStroke) drawStroke(ctx, state.currentStroke);
-  drawCursor();
-  updateStatus();
-}
-function drawGrid(targetCtx, w, h){
-  const gs=CHUNK*state.zoom;
-  const ox=((state.panX%gs)+gs)%gs, oy=((state.panY%gs)+gs)%gs;
-  targetCtx.globalCompositeOperation = 'source-over'; 
-  targetCtx.strokeStyle='rgba(0,255,180,0.06)'; targetCtx.lineWidth=0.5;
-  for(let x=ox;x<w;x+=gs){targetCtx.beginPath();targetCtx.moveTo(x,0);targetCtx.lineTo(x,h);targetCtx.stroke();}
-  for(let y=oy;y<h;y+=gs){targetCtx.beginPath();targetCtx.moveTo(0,y);targetCtx.lineTo(w,y);targetCtx.stroke();}
-}
-
-function drawStroke(targetCtx, stroke) {
-  if (!stroke.points || stroke.points.length === 0) return;
-  const pts = stroke.points.map(w2s);
-  const lineWidth = getRenderWidth(stroke);
-  targetCtx.save();
-  targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
-  
-  if (stroke.tool === 'brush') {
-    targetCtx.globalCompositeOperation = 'destination-out';
-    targetCtx.filter = `blur(${lineWidth * 0.2}px)`; // Real fade
-    targetCtx.lineWidth = lineWidth * 0.6;
-    targetCtx.strokeStyle = 'white'; targetCtx.fillStyle = 'white';
-  } else if (stroke.tool === 'eraser') {
-    targetCtx.globalCompositeOperation = 'source-over';
-    targetCtx.lineWidth = lineWidth;
-    targetCtx.strokeStyle = '#050608'; targetCtx.fillStyle = '#050608';
-  } else {
-    targetCtx.globalCompositeOperation = 'destination-out';
-    targetCtx.lineWidth = lineWidth;
-    targetCtx.strokeStyle = 'white'; targetCtx.fillStyle = 'white';
-  }
-
-  targetCtx.beginPath();
-  if (stroke.tool === 'rect' && pts.length === 2) { targetCtx.strokeRect(pts[0].sx, pts[0].sy, pts[1].sx - pts[0].sx, pts[1].sy - pts[0].sy); }
-  else if (stroke.tool === 'circle' && pts.length === 2) { const dx = pts[1].sx - pts[0].sx, dy = pts[1].sy - pts[0].sy; targetCtx.arc(pts[0].sx, pts[0].sy, Math.sqrt(dx * dx + dy * dy), 0, Math.PI * 2); targetCtx.stroke(); }
-  else {
-    targetCtx.moveTo(pts[0].sx, pts[0].sy);
-    if (pts.length === 1) targetCtx.arc(pts[0].sx, pts[0].sy, lineWidth*0.5, 0, Math.PI*2);
-    else for (let i = 1; i < pts.length; i++) targetCtx.lineTo(pts[i].sx, pts[i].sy);
-    targetCtx.stroke();
-  }
-  targetCtx.restore();
-}
-
-function drawCursor() {
-  const x = state.mouseX, y = state.mouseY; if (x < 0 || y < 0) return;
-  const radius = getRenderWidth({ tool: state.tool, worldSize: calcWorldSize() }) * 0.5;
-  ctx.save(); ctx.strokeStyle = 'rgba(0, 255, 180, 0.8)'; ctx.lineWidth = 1;
-  if (radius > 1) { ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.stroke(); }
-  ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6); ctx.stroke(); ctx.restore();
-}
-
-function updateStatus(){
-  const wp=s2w(state.mouseX,state.mouseY);
-  statusL.textContent=`Pos: ${wp.cx},${wp.cy}`;
-  statusR.textContent=`Striche: ${state.strokes.length} | Zoom: ${state.zoom.toFixed(4)}x`;
-  zoomDisp.textContent=state.zoom.toFixed(2)+'x';
-}
-
-function getPos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
-
-window.addEventListener('keydown', e => { if (e.code === 'Space') { state.spaceDown = true; e.preventDefault(); } });
-window.addEventListener('keyup', e => { if (e.code === 'Space') { state.spaceDown = false; } });
-
-canvas.addEventListener('pointerdown', e => {
-  if (e.button === 1 || state.spaceDown) { state.panning = true; state.lastPX = e.clientX; state.lastPY = e.clientY; return; }
-  const p = getPos(e), wp = s2w(p.x, p.y);
-  state.drawing = true;
-  state.currentStroke = { tool: state.tool, worldSize: calcWorldSize(), points: [wp] };
-  state.redoStack = [];
-  canvas.setPointerCapture(e.pointerId);
-});
-
-canvas.addEventListener('pointermove',e=>{
-  const p=getPos(e); state.mouseX=p.x; state.mouseY=p.y;
-  if(state.panning){
-    const dx = e.clientX - state.lastPX, dy = e.clientY - state.lastPY;
-    state.panX += dx; state.panY += dy; state.plasmaPanX += dx; state.plasmaPanY += dy;
-    state.lastPX = e.clientX; state.lastPY = e.clientY;
-    needsFullRedraw = true; render(); return;
-  }
-  if(state.drawing && state.currentStroke){
-    const wp=s2w(p.x,p.y);
-    if(state.tool==='rect'||state.tool==='circle') state.currentStroke.points[1] = wp;
-    else state.currentStroke.points.push(wp);
-  }
-  render();
-});
-
-canvas.addEventListener('pointerup',()=>{
-  if(state.drawing && state.currentStroke){
-    state.strokes.push(state.currentStroke);
-    drawStroke(bakedCtx, state.currentStroke); // Instant bake for performance
-    state.currentStroke=null; state.drawing=false;
-  }
-  state.panning=false; render();
-});
-
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  const p = getPos(e), f = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  const nz = Math.max(0.0001, Math.min(10000, state.zoom * f)); // Fixed range
-  state.panX = p.x - (p.x - state.panX) * (nz / state.zoom);
-  state.panY = p.y - (p.y - state.panY) * (nz / state.zoom);
-  state.zoom = nz;
-  needsFullRedraw = true; render();
-}, {passive: false});
-
-sizeSlider.addEventListener('input', (e) => { state.size = Math.pow(parseFloat(e.target.value), 2); sizeLabel.textContent = Math.round(state.size); render(); });
-zoomFixSlider.addEventListener('input', (e) => { state.zoomFix = parseInt(e.target.value); zoomFixLabel.textContent = state.zoomFix + '%'; render(); });
-
-function setTool(t){ state.tool=t; document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t)); }
-document.querySelectorAll('.tool-btn[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
-
-document.getElementById('btn-clear').addEventListener('click',()=>{state.strokes=[]; needsFullRedraw=true; render();});
-document.getElementById('btn-reset-view').addEventListener('click',()=>{state.zoom=1; state.panX=0; state.panY=0; needsFullRedraw=true; render();});
-document.getElementById('btn-undo').addEventListener('click',()=>{if(state.strokes.length){state.redoStack.push(state.strokes.pop()); needsFullRedraw=true; render();}});
-document.getElementById('btn-redo').addEventListener('click',()=>{if(state.redoStack.length){state.strokes.push(state.redoStack.pop()); needsFullRedraw=true; render();}});
-
-document.getElementById('btn-save').addEventListener('click', () => {
-  const saveContainer = { strokes: state.strokes, view: { zoom: state.zoom, panX: state.panX, panY: state.panY } }; // View saving
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(saveContainer)], {type: 'application/json'})); a.download = 'paint_project.json'; a.click();
-});
-
-document.getElementById('btn-load').addEventListener('click', () => {
-  const input = document.createElement('input'); input.type = 'file';
-  input.onchange = (e) => {
-    const reader = new FileReader();
-    reader.onload = (re) => {
-      const data = JSON.parse(re.target.result);
-      if (data.view) { state.strokes = data.strokes; state.zoom = data.view.zoom; state.panX = data.view.panX; state.panY = data.view.panY; } 
-      else { state.strokes = data; }
-      needsFullRedraw = true; render();
-    };
-    reader.readAsText(e.target.files[0]);
-  };
-  input.click();
-});
-
-document.getElementById('btn-export').addEventListener('click', () => {
-  const temp = document.createElement('canvas'); temp.width = canvas.width; temp.height = canvas.height;
-  const tCtx = temp.getContext('2d'); tCtx.filter = 'blur(12px) saturate(1.8)'; tCtx.drawImage(plasmaCanvas, 0, 0);
-  tCtx.filter = 'none'; tCtx.drawImage(canvas, 0, 0);
-  const a = document.createElement('a'); a.href = temp.toDataURL(); a.download = 'export.png'; a.click();
-});
-
-resize();
-})();
+const G=GeometryCore();
 </script>
-</body>
-</html>
+<script>
+// Runs independently of the UI. The worker gets the exact same dyadic geometry
+// predicates as the main thread, not a reduced-precision copy.
+function RendererWorker(){
+ const {ZERO,add,sub,mul,cmp,min,max,abs,fromPx,approx,overlap,join,classify,classifyExact}=G;
+ let strokes=[],byId=new Map(),root=null,indexDirty=true,token=0,paintCount=0,cutIndices=new Map();
+ const clock=()=>performance.now();
+ function worldAt(v,x,y){return{x:add(v.cx,fromPx((x-v.w/2)/v.fine,v.level)),y:add(v.cy,fromPx((y-v.h/2)/v.fine,v.level))};}
+ function screen(v,p){return{x:approx(sub(p.x,v.cx),v.level)*v.fine+v.w/2,y:approx(sub(p.y,v.cy),v.level)*v.fine+v.h/2};}
+ function screenNum(v,p){return approx(p,v.level)*v.fine;}
+ function viewBox(v,x,y,w,h){const a=worldAt(v,x,y),b=worldAt(v,x+w,y+h);return{x0:min(a.x,b.x),x1:max(a.x,b.x),y0:min(a.y,b.y),y1:max(a.y,b.y)};}
+ function makeTree(items){if(!items.length)return null;let b=items[0].b;for(let i=1;i<items.length;i++)b=join(b,items[i].b);if(items.length<=12)return{b,items};const horizontal=cmp(sub(b.x1,b.x0),sub(b.y1,b.y0))>=0;items.sort((a,b)=>{const c=horizontal?cmp(add(a.b.x0,a.b.x1),add(b.b.x0,b.b.x1)):cmp(add(a.b.y0,a.b.y1),add(b.b.y0,b.b.y1));return c;});const middle=items.length>>1;return{b,left:makeTree(items.slice(0,middle)),right:makeTree(items.slice(middle))};}
+ function query(tree,view,res){if(!tree||!overlap(tree.b,view))return;if(tree.items){for(const s of tree.items)if(overlap(s.b,view))res.push(s);return;}query(tree.left,view,res);query(tree.right,view,res);}
+ function ensureTree(){if(indexDirty){root=makeTree(strokes.slice());indexDirty=false;}}
+ function visibleCuts(st,tileBox){if(!st.cuts.length)return[];let tree=cutIndices.get(st.id);
+  if(!tree){tree=makeTree(st.cuts.slice());cutIndices.set(st.id,tree);}
+  const found=[];query(tree,tileBox,found);return found;
+ }
+ function apply(op){if(op.action==='add'){strokes.push(op.stroke);byId.set(op.stroke.id,op.stroke);}
+  else if(op.action==='remove'){const i=strokes.findIndex(s=>s.id===op.id);if(i>=0)strokes.splice(i,1);byId.delete(op.id);}
+  else if(op.action==='erase'){for(const id of op.targets){const s=byId.get(id);if(s){s.cuts.push(op.cut);cutIndices.delete(id);}}}
+  else if(op.action==='unerase'){for(const id of op.targets){const s=byId.get(id);if(s){const i=s.cuts.findIndex(c=>c.id===op.cut.id);if(i>=0){s.cuts.splice(i,1);cutIndices.delete(id);}}}}
+  else if(op.action==='clear'){strokes=[];byId.clear();cutIndices.clear();}
+  else if(op.action==='restore'){strokes=op.strokes.slice();byId=new Map(strokes.map(s=>[s.id,s]));cutIndices.clear();}
+  indexDirty=true;token++;
+ }
+ function nativePossible(g,v){
+  const width=screenNum(v,g.half);if(g.shape!=='eraseRect'&&(!Number.isFinite(width)||width<=0||width>1200))return false;
+  if(g.shape==='circle'){const center=screen(v,g.p[0]);const rad=screenNum(v,g.radius);return Number.isFinite(rad)&&rad<=8000&&Math.abs(center.x)<20000&&Math.abs(center.y)<20000;}
+  const points=g.shape==='eraseRect'?[{x:g.b.x0,y:g.b.y0},{x:g.b.x1,y:g.b.y1}]:g.p;
+  for(const p of points){const s=screen(v,p);if(!Number.isFinite(s.x)||!Number.isFinite(s.y)||Math.abs(s.x)>20000||Math.abs(s.y)>20000)return false;}
+  return true;
+ }
+ function drawNative(ctx,g,v){
+  ctx.beginPath();ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=2*screenNum(v,g.half);
+  if(g.shape==='eraseRect') {const a=screen(v,{x:g.b.x0,y:g.b.y0}),b=screen(v,{x:g.b.x1,y:g.b.y1});ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);return;}
+  if(g.shape==='circle'){const c=screen(v,g.p[0]);ctx.arc(c.x,c.y,screenNum(v,g.radius),0,2*Math.PI);ctx.stroke();return;}
+  const ps=g.p;const a=screen(v,ps[0]);if(ps.length===1){ctx.arc(a.x,a.y,screenNum(v,g.half),0,2*Math.PI);ctx.fill();return;}
+  ctx.moveTo(a.x,a.y);for(let i=1;i<ps.length;i++){const pt=screen(v,ps[i]);ctx.lineTo(pt.x,pt.y);}ctx.stroke();
+ }
+ function raster(ctx,g,v,x,y,w,h){
+  // Exact large-scale rasterizer. Most quads are entirely IN or OUT and cost
+  // just one BigInt predicate and one Canvas fillRect; boundaries are refined.
+  const go=(tx,ty,tw,th)=>{
+   const p=worldAt(v,tx+tw*.5,ty+th*.5);
+   const pad=fromPx((tw+th)*.5/v.fine+3/v.fine,v.level);
+   const st=classify(g,p,pad);
+   if(st===0)return;
+   if(st===1){ctx.fillRect(tx,ty,tw,th);return;}
+   if(tw<=1&&th<=1){if(classifyExact(g,p))ctx.fillRect(tx,ty,tw,th);return;}
+   if(tw<=1){const h1=Math.floor(th/2);go(tx,ty,tw,h1);go(tx,ty+h1,tw,th-h1);return;}
+   if(th<=1){const w1=Math.floor(tw/2);go(tx,ty,w1,th);go(tx+w1,ty,tw-w1,th);return;}
+   const w1=Math.floor(tw/2),h1=Math.floor(th/2);
+   go(tx,ty,w1,h1);go(tx+w1,ty,tw-w1,h1);go(tx,ty+h1,w1,th-h1);go(tx+w1,ty+h1,tw-w1,th-h1);
+  };go(x,y,w,h);
+ }
+ function primitive(ctx,g,v,x,y,w,h){ctx.fillStyle='#fff';ctx.strokeStyle='#fff';if(nativePossible(g,v))drawNative(ctx,g,v);else raster(ctx,g,v,x,y,w,h);}
+ async function paint(view,req,rev){
+  const mine=++token,start=clock();
+  const w=Math.min(8192,Math.max(1,Math.ceil(view.w))),h=Math.min(8192,Math.max(1,Math.ceil(view.h)));
+  const output=new OffscreenCanvas(w,h),out=output.getContext('2d',{alpha:true});
+  const TILE=128,scratch=new OffscreenCanvas(TILE,TILE);let sx=scratch.getContext('2d',{alpha:true});
+  ensureTree();const box=viewBox(view,0,0,w,h),candidates=[];query(root,box,candidates);
+  let rasterTiles=0,visiblePieces=0;
+  for(let ty=0;ty<h;ty+=TILE){for(let tx=0;tx<w;tx+=TILE){
+    if(mine!==token)return;
+    const tw=Math.min(TILE,w-tx),th=Math.min(TILE,h-ty),tileBox=viewBox(view,tx,ty,tw,th);
+    if(scratch.width!==tw||scratch.height!==th){scratch.width=tw;scratch.height=th;sx=scratch.getContext('2d',{alpha:true});}
+    out.clearRect(tx,ty,tw,th);
+    for(const st of candidates){if(!overlap(st.b,tileBox))continue;visiblePieces++;
+      sx.setTransform(1,0,0,1,0,0);sx.globalCompositeOperation='source-over';sx.clearRect(0,0,tw,th);
+      sx.setTransform(1,0,0,1,-tx,-ty);
+      primitive(sx,st.geom,view,tx,ty,tw,th);
+      const cuts=visibleCuts(st,tileBox);if(cuts.length){sx.globalCompositeOperation='destination-out';
+        for(const cut of cuts)primitive(sx,cut,view,tx,ty,tw,th);
+      }
+      sx.setTransform(1,0,0,1,0,0);sx.globalCompositeOperation='source-over';out.drawImage(scratch,tx,ty);
+    }
+    rasterTiles++;
+    // Cooperatively yield so a new zoom immediately invalidates old work.
+    if(rasterTiles%3===0){await new Promise(resolve=>setTimeout(resolve,0));if(mine!==token)return;}
+  }}
+  if(mine!==token)return;
+  const bitmap=output.transferToImageBitmap();
+  self.postMessage({type:'frame',req,rev,bitmap,ms:clock()-start,tiles:rasterTiles,visible:visiblePieces,strokes:candidates.length},[bitmap]);paintCount++;
+ }
+ self.onmessage=e=>{try{const m=e.data;
+  if(m.type==='load'){strokes=m.strokes;byId=new Map(strokes.map(s=>[s.id,s]));cutIndices.clear();indexDirty=true;token++;}
+  else if(m.type==='op')apply(m.op);
+  else if(m.type==='paint')paint(m.view,m.req,m.rev).catch(err=>self.postMessage({type:'error',message:err.message}));
+  else if(m.type==='cancel')token++;
+ }catch(err){self.postMessage({type:'error',message:err.message});}};
+ self.postMessage({type:'ready'});
+}
+</script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),stage=$('stage'),canvas=$('screen');
+const overlay=$('overlay'),octx=overlay.getContext('2d'),trail=$('trailLayer'),tctx=trail.getContext('2d');
+const zero=G.ZERO;
+const S={tool:'pen',size:18,q:0,cx:zero,cy:zero,w:1,h:1,dpr:1,strokes:[],nextId:1,undo:[],redo:[],dirty:false,grid:true,plasma:true,ready:false,
+ mode:null,pid:null,start:null,trail:[],journal:[],docRevision:0,camRevision:0,renderedRevision:-1,space:false,panLast:null,
+ requestId:0,renderTimer:0,frame:null,frameView:null,frameRevision:-1,refreshNeeded:true,needsOverlay:true,perf:'Renderer startet',frameCount:0,
+ lastWorkerMS:0,frameInterval:0,fps:0,liveFrame:0,exportPending:false,error:''};
+function view(){const level=Math.floor(S.q);return{cx:S.cx,cy:S.cy,level,fine:Math.pow(2,S.q-level),w:S.w,h:S.h};}
+function worldAt(sx,sy,v=view()){return{x:G.add(v.cx,G.fromPx((sx-v.w/2)/v.fine,v.level)),y:G.add(v.cy,G.fromPx((sy-v.h/2)/v.fine,v.level))};}
+function screenAt(p,v=view()){return{x:G.approx(G.sub(p.x,v.cx),v.level)*v.fine+v.w/2,y:G.approx(G.sub(p.y,v.cy),v.level)*v.fine+v.h/2};}
+function worldRadius(px,v=view()){return G.fromPx(px/v.fine,v.level);}
+function status(){const cuts=S.strokes.reduce((n,s)=>n+s.cuts.length,0);$('footCounts').textContent=`${S.strokes.length} Striche · ${cuts} Aussparungen`;
+ $('footState').textContent=S.dirty?'UNSAVED':'READY';$('footPerf').textContent=S.perf;
+ $('zoomValue').textContent=`2^${S.q.toFixed(2)}`;$('cornerRight').textContent=`ZOOM 2^${S.q.toFixed(2)}`;
+ $('stats').innerHTML=`<div>Striche <strong>${S.strokes.length}</strong></div><div>Aussparungen <strong>${cuts}</strong></div><div>Zoom <strong>2^${S.q.toFixed(2)}</strong></div><div>Anzeige <strong>${R.webgl?'WebGL2':'Canvas2D'}</strong></div><div>Rendertime <strong>${S.lastWorkerMS.toFixed(1)} ms</strong></div>`;
+ $('undo').disabled=!S.undo.length;$('redo').disabled=!S.redo.length;}
+function toast(t){$('toast').textContent=t;$('toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('show'),3200);}
+function point(e){const r=stage.getBoundingClientRect();return{sx:e.clientX-r.left,sy:e.clientY-r.top};}
+function normCamera(){if(!Number.isSafeInteger(Math.floor(S.q)))throw Error('Zoom-Exponent hat Darstellbarkeitsgrenze erreicht.');}
+function setZoom(q,x=S.w/2,y=S.h/2){if(!Number.isFinite(q)||!Number.isSafeInteger(Math.floor(q)))return;const anchor=worldAt(x,y);S.q=q;const v=view();S.cx=G.sub(anchor.x,G.fromPx((x-v.w/2)/v.fine,v.level));S.cy=G.sub(anchor.y,G.fromPx((y-v.h/2)/v.fine,v.level));cameraChanged();}
+function pan(dx,dy){const v=view();S.cx=G.sub(S.cx,G.fromPx(dx/v.fine,v.level));S.cy=G.sub(S.cy,G.fromPx(dy/v.fine,v.level));cameraChanged();}
+function cameraChanged(){
+ S.camRevision++;S.refreshNeeded=true;R.deltaDirty=true;R.maskCompositeDirty=true;
+ // A mousewheel event must remain O(1) in document size.
+ const z=`2^${S.q.toFixed(2)}`;
+ $('zoomValue').textContent=z;$('cornerRight').textContent='ZOOM '+z;
+ schedulePaint(160);
+}
+// GPU compositor: a finished bitmap remains on the GPU while the camera moves.
+// A fresh worker frame atomically replaces the previous texture; there is never
+// an in-between clear/repaint of the visible presentation canvas.
+const VERT=`#version 300 es
+precision highp float;
+void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.0-1.0,0.,1.);}`;
+const FRAG=`#version 300 es
+precision highp float;
+uniform vec2 u_screen;uniform float u_dpr;uniform vec2 u_uv0;uniform float u_uvStep;
+uniform vec2 u_maskSize;uniform bool u_hasMask;uniform sampler2D u_mask;uniform float u_maskFlip;uniform sampler2D u_delta;uniform bool u_hasDelta;
+uniform float u_time;uniform float u_grid;uniform float u_plasma;
+uniform vec2 u_gridPhase;uniform float u_gridStep;
+out vec4 outColor;
+float gridLine(vec2 pos, float line){vec2 t=abs(fract(pos)-.5);return 1.0-smoothstep(line,line+0.009,max(t.x,t.y));}
+void main(){vec2 p=vec2(gl_FragCoord.x/u_dpr,u_screen.y-gl_FragCoord.y/u_dpr);
+ vec2 gc=(p-u_screen*.5)/u_gridStep+u_gridPhase;
+ float g=u_grid*(1.0-smoothstep(0.485,0.500,max(abs(fract(gc.x)-.5),abs(fract(gc.y)-.5))));
+ vec3 base=vec3(.016,.031,.047)+vec3(.0,.052,.065)*g;
+ float alpha=0.;
+ if(u_hasMask && u_uvStep>0.0){vec2 old=u_uv0+p*u_uvStep;vec2 uv=old/u_maskSize;
+   if(all(greaterThanEqual(uv,vec2(0.0)))&&all(lessThan(uv,vec2(1.0))))alpha=texture(u_mask,vec2(uv.x,mix(uv.y,1.0-uv.y,u_maskFlip))).a;
+ }
+ if(u_hasDelta){vec2 uv=p/u_screen;vec4 delta=texture(u_delta,vec2(uv.x,mix(uv.y,1.0-uv.y,u_maskFlip)));alpha=mix(alpha,delta.r,delta.a);}
+ float waves=sin(p.x*.008+u_time*.41)*.24+cos(p.y*.009-u_time*.3)*.21+sin((p.x+p.y)*.006+u_time*.51)*.24;
+ float f=clamp(.5+waves,0.0,1.0);
+ vec3 plasma=mix(vec3(.03,.96,1.),vec3(.97,.15,.85),f);
+ plasma=mix(plasma,vec3(.45,1.,.17),.20+.16*sin(u_time*.4+p.y*.004));
+ vec3 ink=mix(vec3(.27,.97,.83),plasma,u_plasma*.95);
+ outColor=vec4(mix(base,ink,alpha),1.0);
+}`;
+const R={webgl:false,gl:null,ctx:null,program:null,loc:null,texture:null,maskCanvas:null,maskContext:null,ready:false,width:1,height:1,maskFlip:1,deltaTexture:null,deltaCanvas:null,deltaCtx:null,maskComposite:null,maskCompositeCtx:null,maskCompositeDirty:true,deltaDirty:true,hasDelta:false};
+function compile(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+
+// One-time GPU orientation self-test. The Worker sends an ImageBitmap, and for
+// ImageBitmap uploads WebGL ignores UNPACK_FLIP_Y_WEBGL. Never assume its V sign.
+// Compare two shader orientations using a 2x2 top-only alpha marker and readback.
+// This runs against the user's actual GPU / Firefox, not the developer's browser.
+function detectMaskOrientation(gl,loc,texture,screenCanvas){
+ const probeCanvas=new OffscreenCanvas(2,2),pctx=probeCanvas.getContext('2d');
+ pctx.clearRect(0,0,2,2);pctx.fillStyle='#ffffff';pctx.fillRect(0,0,2,1);
+ const bmp=probeCanvas.transferToImageBitmap();
+ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false); // Ignored by ImageBitmap; documented for clarity.
+ try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bmp);}finally{bmp.close();}
+ gl.viewport(0,0,2,2);gl.uniform2f(loc.screen,2,2);gl.uniform1f(loc.dpr,1);
+ gl.uniform2f(loc.uv0,0,0);gl.uniform1f(loc.uvStep,1);
+ gl.uniform2f(loc.maskSize,2,2);gl.uniform1i(loc.hasMask,1);
+ gl.uniform1f(loc.time,0);gl.uniform1f(loc.grid,0);gl.uniform1f(loc.plasma,0);
+ gl.uniform2f(loc.gridPhase,0,0);gl.uniform1f(loc.gridStep,128);
+ const pixels=new Uint8Array(4);
+ const score=(flip)=>{
+  gl.uniform1f(loc.maskFlip,flip);gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.readPixels(0,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const top=pixels[1];
+  gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const bottom=pixels[1];
+  return top-bottom;
+ };
+ let normal=score(0),flipped=score(1);
+ gl.viewport(0,0,screenCanvas.width,screenCanvas.height);
+ if(gl.getError()!==gl.NO_ERROR || Math.abs(normal-flipped)<25)
+   throw Error('WebGL-Maskenorientierung nicht eindeutig messbar');
+ const selected=flipped>normal?1:0;
+ console.info('NIRIN GPU Y-orientation calibrated:',{normal,flipped,selected});
+ return selected;
+}
+function initDisplay(){let gl=null;try{gl=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:true});}catch(e){console.warn(e);}
+ if(gl){try{const program=gl.createProgram();gl.attachShader(program,compile(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(program,compile(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);gl.useProgram(program);
+  const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const deltaTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,deltaTexture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  const loc={};for(const name of ['screen','dpr','uv0','uvStep','maskSize','hasMask','mask','maskFlip','delta','hasDelta','time','grid','plasma','gridPhase','gridStep'])loc[name]=gl.getUniformLocation(program,'u_'+name);
+  gl.uniform1i(loc.mask,0);gl.uniform1i(loc.delta,1);
+  const maskFlip=detectMaskOrientation(gl,loc,texture,canvas);
+  R.webgl=true;R.gl=gl;R.program=program;R.loc=loc;R.texture=texture;R.maskFlip=maskFlip;R.deltaTexture=deltaTexture;gl.uniform1f(loc.maskFlip,maskFlip);gl.uniform1i(loc.hasDelta,0);R.ready=true;
+  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();toast('GPU-Kontext verloren – Seite neu laden');});
+  return;
+ }catch(e){console.warn('WebGL2 unavailable or shader compilation failed',e);toast('WebGL2-Fehler: Canvas2D-Fallback wird verwendet.');}}
+ // A canvas with a WebGL context cannot get 2D, replace it.
+ const replacement=canvas.cloneNode(false);canvas.replaceWith(replacement);R.canvas=replacement;R.ctx=replacement.getContext('2d',{alpha:false});R.maskCanvas=document.createElement('canvas');R.maskContext=R.maskCanvas.getContext('2d');R.ready=true;
+}
+initDisplay();
+function actualCanvas(){return R.webgl?canvas:R.canvas;}
+function resize(){const rect=stage.getBoundingClientRect(),w=Math.max(1,Math.round(rect.width)),h=Math.max(1,Math.round(rect.height)),dpr=Math.min(2,window.devicePixelRatio||1);
+ if(w===S.w&&h===S.h&&dpr===S.dpr)return;
+ S.w=w;S.h=h;S.dpr=dpr;const c=actualCanvas();c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);
+ for(const layer of [overlay,trail]){layer.width=c.width;layer.height=c.height;layer.style.width=w+'px';layer.style.height=h+'px';}
+ if(R.webgl)R.gl.viewport(0,0,c.width,c.height);
+ R.deltaCanvas=document.createElement('canvas');R.deltaCanvas.width=w;R.deltaCanvas.height=h;R.deltaCtx=R.deltaCanvas.getContext('2d',{willReadFrequently:false});
+ R.maskComposite=document.createElement('canvas');R.maskComposite.width=w;R.maskComposite.height=h;R.maskCompositeCtx=R.maskComposite.getContext('2d');
+ R.deltaDirty=true;R.maskCompositeDirty=true;cameraChanged();}
+function gridPhase(p,level){if(p.n===0n)return 0;const shift=p.e+level+20;const v=shift>=0?p.n<<BigInt(shift):p.n>>BigInt(-shift);const m=16n<<20n;return Number((v%m+m)%m)/1048576;}
+function compositorPosition(){if(!S.frame||!S.frameView)return null;const now=view(),old=S.frameView;
+ const diff=old.level-now.level;const step=Math.pow(2,diff)*old.fine/now.fine;
+ if(!Number.isFinite(step)||step<1e-14||step>1e14)return null;
+ const rel=screenAt({x:now.cx,y:now.cy},old);
+ if(!Number.isFinite(rel.x)||!Number.isFinite(rel.y)||Math.abs(rel.x)>1e14||Math.abs(rel.y)>1e14)return null;
+ return{x:rel.x-S.w*.5*step,y:rel.y-S.h*.5*step,step};}
+function renderGPU(time){const gl=R.gl,l=R.loc;gl.useProgram(R.program);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,R.texture);
+ updateDeltaTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,R.deltaTexture);gl.uniform1i(l.hasDelta,R.hasDelta?1:0);
+ const relative=compositorPosition(),g=7;const base=Math.floor(S.q);const frac=S.q-base;
+ // Grid phase derived from exact BigInt camera position rather than huge float positions.
+ gl.uniform2f(l.gridPhase,gridPhase(S.cx,base-7),gridPhase(S.cy,base-7));gl.uniform1f(l.gridStep,Math.pow(2,7+frac));
+ gl.uniform2f(l.screen,S.w,S.h);gl.uniform1f(l.dpr,S.dpr);
+ gl.uniform1f(l.time,time*.001);gl.uniform1f(l.grid,S.grid?1:0);gl.uniform1f(l.plasma,S.plasma?1:0);
+ gl.uniform1i(l.hasMask,relative?1:0);gl.uniform1f(l.maskFlip,R.maskFlip);
+ if(relative){gl.uniform2f(l.uv0,relative.x,relative.y);gl.uniform1f(l.uvStep,relative.step);gl.uniform2f(l.maskSize,S.frame.width,S.frame.height);}else{gl.uniform1f(l.uvStep,0);gl.uniform2f(l.maskSize,1,1);}
+ gl.drawArrays(gl.TRIANGLES,0,3);}
+function rebuildComposite(){
+ if(!R.maskCompositeDirty)return;
+ const c=R.maskCompositeCtx,w=S.w,h=S.h;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,w,h);
+ const rel=compositorPosition();if(rel&&R.maskCanvas&&R.maskCanvas.width){
+  const scale=1/rel.step;
+  c.drawImage(R.maskCanvas,-rel.x*scale,-rel.y*scale,R.maskCanvas.width*scale,R.maskCanvas.height*scale);
+ }
+ // Same document operations as GPU override; Canvas2D can use destination-out directly.
+ applyVisualOperations(c,false);
+ R.maskCompositeDirty=false;
+}
+function renderFallback(time){const c=R.ctx,w=S.w,h=S.h;
+ rebuildComposite();c.setTransform(S.dpr,0,0,S.dpr,0,0);c.fillStyle='#08131e';c.fillRect(0,0,w,h);
+ c.drawImage(R.maskComposite,0,0,w,h);
+ if(S.grid){const step=128;const offx=((gridPhase(S.cx,Math.floor(S.q)-7)*step+w/2)%step+step)%step;const offy=((gridPhase(S.cy,Math.floor(S.q)-7)*step+h/2)%step+step)%step;
+  c.strokeStyle='#12606c77';c.lineWidth=1;c.beginPath();for(let x=offx;x<w;x+=step){c.moveTo(x,0);c.lineTo(x,h);}for(let y=offy;y<h;y+=step){c.moveTo(0,y);c.lineTo(w,y);}c.stroke();}
+}
+let lastTick=0,lastStatus=0,times=[];
+function frame(time){resize();if(R.ready){if(R.webgl)renderGPU(time);else renderFallback(time);}
+ if(lastTick){times.push(time-lastTick);if(times.length>100)times.shift();}lastTick=time;
+ if(time-lastStatus>850){lastStatus=time;const total=times.reduce((a,b)=>a+b,0);S.fps=total?1000*times.length/total:0;
+ $('footPerf').textContent=`${R.webgl?'GPU':'2D'} ${S.fps.toFixed(0)} FPS · Render ${S.lastWorkerMS.toFixed(0)}ms`;}
+ requestAnimationFrame(frame);}
+function updatePointer(sx,sy){const ring=$('pointer');const w=S.size*(S.tool==='brush'?2:1);ring.style.width=w+'px';ring.style.height=w+'px';ring.style.transform=`translate(${sx-w/2}px,${sy-w/2}px)`;}
+// NROP: A ToolSession has geometry only. It never owns a second permanent image.
+// Journal holds committed, not-yet-snapshotted scene transactions.
+// Worker images are immutable projections of SceneDocument at a revision.
+function draftGeometry(){
+ if(S.mode!=='draw'||!S.trail.length)return null;
+ const pts=S.trail.map(t=>t.w),shape=S.tool,v=S.start||view();
+ if(shape==='eraser'||shape==='eraseRect')return geometry(shape,pts,shape==='eraseRect'?zero:worldRadius(S.size/2,v));
+ return previewStrokeGeometry(shape,pts,S.size,v);
+}
+function previewStrokeGeometry(shape,pts,size,v){
+ const half=worldRadius(size*(shape==='brush'?1:.5),v);let radius=zero;
+ if(shape==='circle'&&pts.length>1){const a=screenAt(pts[0],v),b=screenAt(pts[pts.length-1],v);radius=worldRadius(Math.hypot(a.x-b.x,a.y-b.y),v);}
+ return geometry(shape,pts,half,radius);
+}
+function visualEntry(op){
+ if(op.action==='add')return{geom:op.stroke.geom,erase:false};
+ if(op.action==='erase')return{geom:op.cut,erase:true};
+ if(op.action==='clear')return{clear:true};
+ if(op.action==='rebuild')return{rebuild:op.strokes};
+ return null;
+}
+function projectedOperations(){
+ const list=[];
+ for(const event of S.journal){const e=visualEntry(event.op);if(e)list.push(e);}
+ const live=draftGeometry();if(live)list.push({geom:live,erase:S.tool==='eraser'||S.tool==='eraseRect'});
+ return list;
+}
+function invalidateProjection(){R.deltaDirty=true;R.maskCompositeDirty=true;}
+// The same geometric predicates as the worker: native paths when bounded,
+// adaptive BigInt quad recursion if the line has become a screen-sized plane.
+function paintSceneGeometry(ctx,g,color){
+ const v=view(),screen=p=>screenAt(p,v),width=G.approx(g.half,v.level)*v.fine*2;
+ const ps=g.shape==='eraseRect'?[{x:g.b.x0,y:g.b.y0},{x:g.b.x1,y:g.b.y1}]:g.p;
+ const bounded=ps.every(p=>{const t=screen(p);return Number.isFinite(t.x)&&Number.isFinite(t.y)&&Math.abs(t.x)<20000&&Math.abs(t.y)<20000;});
+ const native=(g.shape==='eraseRect'&&bounded)||(bounded&&Number.isFinite(width)&&width>0&&width<=1200&&(g.shape!=='circle'||Number.isFinite(G.approx(g.radius,v.level)*v.fine)&&G.approx(g.radius,v.level)*v.fine<8000));
+ ctx.fillStyle=color;ctx.strokeStyle=color;
+ if(native){ctx.save();ctx.beginPath();ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=width;
+  if(g.shape==='eraseRect'){const a=screen({x:g.b.x0,y:g.b.y0}),b=screen({x:g.b.x1,y:g.b.y1});ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);}
+  else if(g.shape==='circle'){const a=screen(g.p[0]);ctx.arc(a.x,a.y,G.approx(g.radius,v.level)*v.fine,0,Math.PI*2);ctx.stroke();}
+  else{let p=screen(g.p[0]);if(g.p.length===1){ctx.arc(p.x,p.y,width/2,0,Math.PI*2);ctx.fill();}
+   else{ctx.moveTo(p.x,p.y);for(let i=1;i<g.p.length;i++){p=screen(g.p[i]);ctx.lineTo(p.x,p.y);}ctx.stroke();}}
+  ctx.restore();return;
+ }
+ const paint=(x,y,w,h)=>{
+  const middle=worldAt(x+w*.5,y+h*.5);
+  const pad=worldRadius((w+h)*.5+3,v);
+  const cls=G.classify(g,middle,pad);
+  if(cls===0)return;
+  if(cls===1){ctx.fillRect(x,y,w,h);return;}
+  if(w<=1&&h<=1){if(G.classifyExact(g,middle))ctx.fillRect(x,y,w,h);return;}
+  if(w<=1){const a=Math.floor(h/2);paint(x,y,w,a);paint(x,y+a,w,h-a);return;}
+  if(h<=1){const a=Math.floor(w/2);paint(x,y,a,h);paint(x+a,y,w-a,h);return;}
+  const a=Math.floor(w/2),b=Math.floor(h/2);
+  paint(x,y,a,b);paint(x+a,y,w-a,b);paint(x,y+b,a,h-b);paint(x+a,y+b,w-a,h-b);
+ };
+ // Whole-screen raster is only needed for giant shapes with a visible boundary.
+ paint(0,0,S.w,S.h);
+}
+function applyVisualOperations(ctx,override,operations=projectedOperations()){
+ for(const op of operations){
+  if(op.clear){ctx.save();ctx.globalCompositeOperation=override?'source-over':'destination-out';
+   ctx.fillStyle=override?'#000':'#fff';ctx.fillRect(0,0,S.w,S.h);ctx.restore();continue;}
+  if(op.rebuild){
+   ctx.save();ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,S.w,S.h);
+   if(override){ctx.fillStyle='#000';ctx.fillRect(0,0,S.w,S.h);}
+   const sc=document.createElement('canvas');sc.width=S.w;sc.height=S.h;const sx=sc.getContext('2d');
+   for(const stroke of op.rebuild){
+    sx.globalCompositeOperation='source-over';sx.clearRect(0,0,S.w,S.h);
+    paintSceneGeometry(sx,stroke.geom,override?'#fff':'#42fff0');
+    for(const cut of stroke.cuts){sx.globalCompositeOperation='destination-out';paintSceneGeometry(sx,cut,'#fff');}
+    sx.globalCompositeOperation='source-over';ctx.drawImage(sc,0,0);
+   }
+   ctx.restore();continue;
+  }
+  ctx.save();ctx.globalCompositeOperation=override?'source-over':op.erase?'destination-out':'source-over';
+  paintSceneGeometry(ctx,op.geom,override?(op.erase?'#000000':'#ffffff'):'#42fff0');ctx.restore();
+ }
+}
+function updateDeltaTexture(){
+ if(!R.deltaDirty)return;
+ const c=R.deltaCtx;if(!c)return;
+ c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,S.w,S.h);
+ const ops=projectedOperations();R.hasDelta=ops.length>0;
+ applyVisualOperations(c,true,ops);
+ if(R.webgl){
+  const gl=R.gl;
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,R.deltaTexture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+  // ImageBitmap and committed mask share the exact same orientation calibration.
+  // c is a CanvasRenderingContext2D, not a canvas: passing it caused
+  // OffscreenCanvas(undefined, undefined) and an uncaught Firefox TypeError.
+  const bitmap=createImageBitmapAvailable(R.deltaCanvas);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+  bitmap.close();gl.activeTexture(gl.TEXTURE0);
+ }
+ R.deltaDirty=false;
+}
+function createImageBitmapAvailable(canvas){
+ // transferToImageBitmap is synchronous and guarantees ImageBitmap upload semantics.
+ const off=new OffscreenCanvas(canvas.width,canvas.height);off.getContext('2d').drawImage(canvas,0,0);
+ return off.transferToImageBitmap();
+}
+function geometry(shape,pts,half,radius=zero){if(!pts.length)throw Error('Leere Geometrie');let p=pts;
+ if(shape==='rect'){const a=p[0],b=p[p.length-1];p=[a,{x:b.x,y:a.y},b,{x:a.x,y:b.y},a];}
+ let b;if(shape==='circle'){const rr=G.add(radius,half),c=p[0];b={x0:G.sub(c.x,rr),x1:G.add(c.x,rr),y0:G.sub(c.y,rr),y1:G.add(c.y,rr)};p=[c];}
+ else if(shape==='eraseRect')b=G.boxArea(p[0],p[p.length-1]);else b=G.bounds(p,half);
+ return{shape,p,half,radius,b};}
+function makeStroke(shape,points,toolSize=S.size,v=view()){
+ const half=worldRadius(toolSize*(shape==='brush'?1:.5),v);let radius=zero;
+ if(shape==='circle'&&points.length>1){const a=screenAt(points[0],v),b=screenAt(points[points.length-1],v);radius=worldRadius(Math.hypot(a.x-b.x,a.y-b.y),v);}
+ const g=geometry(shape,points,half,radius);return{id:S.nextId++,geom:g,b:g.b,cuts:[]};}
+function makeCut(points,rect=false,toolSize=S.size,v=view()){const g=geometry(rect?'eraseRect':'eraser',points,rect?zero:worldRadius(toolSize/2,v));return{id:S.nextId++,...g};}
+function localApply(op){if(op.action==='add')S.strokes.push(op.stroke);
+ else if(op.action==='remove'){const idx=S.strokes.findIndex(s=>s.id===op.id);if(idx>=0)S.strokes.splice(idx,1);}
+ else if(op.action==='erase'){for(const s of S.strokes){if(op.targets.includes(s.id))s.cuts.push(op.cut);}}
+ else if(op.action==='unerase'){for(const s of S.strokes){if(op.targets.includes(s.id)){const i=s.cuts.findIndex(c=>c.id===op.cut.id);if(i>=0)s.cuts.splice(i,1);}}}
+ else if(op.action==='clear')S.strokes=[];
+ else if(op.action==='restore')S.strokes=op.strokes.slice();}
+let worker=null;
+function change(redo,undo){
+ localApply(redo);S.docRevision++;S.dirty=true;S.redo=[];
+ S.undo.push({redo,undo});if(S.undo.length>1000)S.undo.shift();
+ S.journal.push({revision:S.docRevision,op:redo.action==='restore'?{action:'rebuild',strokes:structuredClone(S.strokes)}:redo});
+ worker.postMessage({type:'op',op:redo});invalidateProjection();status();schedulePaint(15);
+}
+function addStroke(shape,pts,size=S.size,v=view()){const st=makeStroke(shape,pts,size,v);change({action:'add',stroke:st},{action:'remove',id:st.id,stroke:st});return st;}
+function erase(pts,rect=false,size=S.size,v=view()){const cut=makeCut(pts,rect,size,v),targets=S.strokes.filter(s=>G.overlap(s.b,cut.b)).map(s=>s.id);
+ if(targets.length)change({action:'erase',cut,targets},{action:'unerase',cut,targets});return{cut,targets};}
+function undo(){if(!S.undo.length)return;const item=S.undo.pop();localApply(item.undo);S.redo.push(item);S.docRevision++;S.dirty=true;S.journal.push({revision:S.docRevision,op:{action:'rebuild',strokes:structuredClone(S.strokes)}});worker.postMessage({type:'op',op:item.undo});invalidateProjection();status();schedulePaint(0);}
+function redo(){if(!S.redo.length)return;const item=S.redo.pop();localApply(item.redo);S.undo.push(item);S.docRevision++;S.dirty=true;S.journal.push({revision:S.docRevision,op:{action:'rebuild',strokes:structuredClone(S.strokes)}});worker.postMessage({type:'op',op:item.redo});invalidateProjection();status();schedulePaint(0);}
+function clearDoc(){if(S.strokes.length)change({action:'clear'},{action:'restore',strokes:S.strokes.slice()});}
+function clearBaseSnapshot(){
+ if(S.frame){S.frame.close();S.frame=null;}S.frameView=null;S.frameRevision=-1;
+ if(R.webgl){R.gl.activeTexture(R.gl.TEXTURE0);R.gl.bindTexture(R.gl.TEXTURE_2D,R.texture);
+  R.gl.texImage2D(R.gl.TEXTURE_2D,0,R.gl.RGBA,1,1,0,R.gl.RGBA,R.gl.UNSIGNED_BYTE,new Uint8Array(4));}
+ else {R.maskCanvas.width=1;R.maskCanvas.height=1;R.maskContext.clearRect(0,0,1,1);}
+ invalidateProjection();
+}
+function schedulePaint(ms=130){clearTimeout(S.renderTimer);S.requestId++;const req=S.requestId;if(S.ready)worker.postMessage({type:'cancel'});
+ S.renderTimer=setTimeout(()=>{if(!S.ready||req!==S.requestId)return;const reqView=view();S.pendingView=reqView;S.paintCamRevision=S.camRevision;
+ worker.postMessage({type:'paint',view:reqView,req,rev:S.docRevision});},ms);}
+function setTexture(bitmap){if(R.webgl){const gl=R.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,R.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);}else{
+ R.maskCanvas.width=bitmap.width;R.maskCanvas.height=bitmap.height;R.maskCompositeDirty=true;const c=R.maskContext;c.clearRect(0,0,bitmap.width,bitmap.height);c.fillStyle='#42fff0';c.fillRect(0,0,bitmap.width,bitmap.height);c.globalCompositeOperation='destination-in';c.drawImage(bitmap,0,0);c.globalCompositeOperation='source-over';}
+}
+function initWorker(){const code=`const G=(${GeometryCore.toString()})();\n(${RendererWorker.toString()})();`;
+ const uri=URL.createObjectURL(new Blob([code],{type:'application/javascript'}));worker=new Worker(uri);URL.revokeObjectURL(uri);
+ worker.onmessage=e=>{const m=e.data;if(m.type==='ready'){S.ready=true;worker.postMessage({type:'load',strokes:S.strokes});schedulePaint(0);status();}
+ else if(m.type==='frame'){
+  if(m.req!==S.requestId||m.rev!==S.docRevision||S.paintCamRevision!==S.camRevision){m.bitmap.close();return;}
+  try{setTexture(m.bitmap);if(S.frame)S.frame.close();S.frame=m.bitmap;S.frameView=S.pendingView;S.frameRevision=m.rev;S.lastWorkerMS=m.ms;
+   S.journal=S.journal.filter(p=>p.revision>m.rev);invalidateProjection();S.frameCount++;status();
+   if(S.exportPending){S.exportPending=false;exportPNG();}}
+  catch(err){console.error(err);toast('Bildübernahme fehlgeschlagen: '+err.message);m.bitmap.close();}}
+ else if(m.type==='error'){S.error=m.message;toast('Renderer: '+m.message);console.error(m.message);}};
+ worker.onerror=e=>{toast('Worker-Fehler: '+e.message);console.error(e);};}
+function down(e){if(e.button!==0&&e.button!==1)return;if(S.mode)return;const p=point(e);S.pid=e.pointerId;stage.setPointerCapture(e.pointerId);
+ if(e.button===1||S.space||S.tool==='hand'){S.mode='pan';S.panLast=p;stage.classList.add('panning');return;}
+ S.mode='draw';S.start=view();S.trail=[{...p,w:worldAt(p.sx,p.sy)}];updatePointer(p.sx,p.sy);invalidateProjection();}
+function move(e){const p=point(e);updatePointer(p.sx,p.sy);if(e.pointerId!==S.pid)return;
+ if(S.mode==='pan'){const dx=p.sx-S.panLast.sx,dy=p.sy-S.panLast.sy;if(dx||dy)pan(dx,dy);S.panLast=p;return;}
+ if(S.mode==='draw'){const t={...p,w:worldAt(p.sx,p.sy)};if(['rect','circle','eraseRect'].includes(S.tool)){S.trail[1]=t;}else{
+ const prev=S.trail[S.trail.length-1];if(Math.hypot(prev.sx-t.sx,prev.sy-t.sy)<1.3)return;S.trail.push(t);}invalidateProjection();}}
+function up(e){if(e.pointerId!==S.pid)return;const mode=S.mode;S.mode=null;S.pid=null;stage.classList.remove('panning');try{stage.releasePointerCapture(e.pointerId);}catch(_){ }
+ if(mode!=='draw')return;const pts=S.trail.map(p=>p.w),start=S.start;S.trail=[];S.start=null;invalidateProjection();
+ if(!pts.length)return;if(S.tool==='eraser')erase(pts,false,S.size,start);else if(S.tool==='eraseRect')erase(pts.length>1?pts:[pts[0],pts[0]],true,S.size,start);else addStroke(S.tool,pts,S.size,start);}
+function cancel(e){if(e.pointerId!==S.pid)return;S.mode=null;S.pid=null;S.trail=[];S.start=null;stage.classList.remove('panning');invalidateProjection();}
+function dyadValid(p){return p&&typeof p.n==='bigint'&&Number.isSafeInteger(p.e);}
+function ptValid(p){return p&&dyadValid(p.x)&&dyadValid(p.y);}
+function validateStrokes(strokes){if(!Array.isArray(strokes)||strokes.length>200000)throw Error('Ungültige Strichliste');let total=0;const ids=new Set();
+ for(const s of strokes){if(!s||!Number.isSafeInteger(s.id)||ids.has(s.id)||!s.geom||!Array.isArray(s.geom.p)||!s.geom.p.length||!s.geom.p.every(ptValid)||!dyadValid(s.geom.half)||!dyadValid(s.geom.radius)||!s.b||!['x0','x1','y0','y1'].every(k=>dyadValid(s.b[k]))||!Array.isArray(s.cuts))throw Error('Ungültige Strichgeometrie');ids.add(s.id);
+ for(const c of s.cuts){if(!c||!Number.isSafeInteger(c.id)||!Array.isArray(c.p)||!c.p.length||!c.p.every(ptValid)||!dyadValid(c.half)||!c.b||!['x0','x1','y0','y1'].every(k=>dyadValid(c.b[k])))throw Error('Ungültige Radierung');}
+ total+=s.geom.p.length+s.cuts.reduce((a,b)=>a+b.p.length,0);if(total>2000000)throw Error('Projekt überschreitet das Sicherheitslimit');}}
+function parseLegacy(data){if(data.format==='nirin-infinidraw'&&data.version===2){const tick=n=>G.d(n,-512),p=q=>({x:tick(q.x),y:tick(q.y)}),strokes=[];
+ for(const s of data.strokes){const born=Number(s.bornZoom||0),lv=Math.floor(born),fine=Math.pow(2,born-lv),pts=s.points.map(p),half=G.fromPx(Number(s.size||12)*(s.kind==='brush'?1.1:.5)/fine,lv);
+ let rad=zero;if(s.kind==='circle'&&pts.length>1){const a=pts[0],b=pts[1];rad=G.fromPx(Math.hypot(G.approx(G.sub(a.x,b.x),lv),G.approx(G.sub(a.y,b.y),lv))/fine,lv);}const g=geometry(s.kind,pts,half,rad);
+ const cuts=(s.cuts||[]).map(c=>{const gg=geometry('eraser',c.points.map(p),tick(c.radius));return{id:S.nextId++,...gg};});strokes.push({id:S.nextId++,geom:g,b:g.b,cuts});}
+ return{strokes,view:{cx:tick(data.view.cx),cy:tick(data.view.cy),q:Number(data.view.zoom||0)}};}
+ if(Array.isArray(data)||Array.isArray(data.strokes)){const original=Array.isArray(data)?data:data.strokes,strokes=[];
+ for(const s of original){if(!Array.isArray(s.points)||!s.points.length)throw Error('Fehlerhafte alte Datei');const pts=s.points.map(p=>({x:G.fromPx(Number(p.cx)*1000+Number(p.lx)),y:G.fromPx(Number(p.cy)*1000+Number(p.ly))}));const shape=['pen','brush','rect','circle'].includes(s.tool)?s.tool:'pen';const gg=geometry(shape,pts,G.fromPx(Number(s.worldSize||s.size||10)/2));strokes.push({id:S.nextId++,geom:gg,b:gg.b,cuts:[]});}
+ return{strokes,view:{cx:zero,cy:zero,q:0}};}
+ throw Error('Unbekanntes Projektformat');}
+function serialize(){return G.toJSON({format:'nirin-infinidraw',version:3,view:{cx:S.cx,cy:S.cy,zoomQ:Math.round(S.q*4),q:S.q},nextId:S.nextId,strokes:S.strokes,engine:'camera-core'});}
+function loadText(text){const parsed=G.fromJSON(text);let data;
+ if(parsed&&parsed.format==='nirin-infinidraw'&&parsed.version===3){data={strokes:parsed.strokes,view:{cx:parsed.view.cx,cy:parsed.view.cy,q:Number.isFinite(parsed.view.q)?parsed.view.q:Number(parsed.view.zoomQ)/4},nextId:parsed.nextId};}
+ else data=parseLegacy(parsed);validateStrokes(data.strokes);
+ if(!data.view||!dyadValid(data.view.cx)||!dyadValid(data.view.cy)||!Number.isFinite(data.view.q)||!Number.isSafeInteger(Math.floor(data.view.q)))throw Error('Ungültiger Zoom');
+ S.strokes=data.strokes;S.cx=data.view.cx;S.cy=data.view.cy;S.q=data.view.q;
+ S.nextId=Number.isSafeInteger(data.nextId)&&data.nextId>0?data.nextId:1;
+ for(const s of S.strokes){S.nextId=Math.max(S.nextId,s.id+1);for(const c of s.cuts)S.nextId=Math.max(S.nextId,c.id+1);} 
+ S.undo=[];S.redo=[];S.journal=[];S.docRevision++;S.camRevision++;S.dirty=false;clearBaseSnapshot();worker.postMessage({type:'load',strokes:S.strokes});invalidateProjection();status();schedulePaint(0);toast(`${S.strokes.length} Striche geladen`);}
+function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),15000);}
+function exportPNG(){if(!S.frame||S.frameRevision!==S.docRevision||!S.frameView||S.paintCamRevision!==S.camRevision){S.exportPending=true;toast('Export wartet auf präzise Renderingdaten…');schedulePaint(0);return;}
+ if(R.webgl)renderGPU(performance.now());
+ const c=document.createElement('canvas');c.width=actualCanvas().width;c.height=actualCanvas().height;const ctx=c.getContext('2d');ctx.drawImage(actualCanvas(),0,0);
+ c.toBlob(b=>{if(b)download(b,'nirin_ansehen.png');else toast('PNG-Export nicht möglich');},'image/png');}
+window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement&&e.target.type!=='range')return;
+ if(e.code==='Space'){S.space=true;e.preventDefault();}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+ else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+ else if(!e.ctrlKey&&!e.metaKey){const tools={p:'pen',b:'brush',e:'eraser',x:'eraseRect',r:'rect',c:'circle',h:'hand'};const tool=tools[e.key.toLowerCase()];if(tool)setTool(tool);}});
+window.addEventListener('keyup',e=>{if(e.code==='Space')S.space=false;});window.addEventListener('blur',()=>{S.space=false;});
+function setTool(name){S.tool=name;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===name));}
+stage.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;down(e);});stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',cancel);stage.addEventListener('contextmenu',e=>e.preventDefault());stage.addEventListener('pointerleave',()=>{$('pointer').style.transform='translate(-10000px,-10000px)';});
+stage.addEventListener('wheel',e=>{e.preventDefault();const p=point(e),dy=e.deltaMode===1?e.deltaY*16:e.deltaY;setZoom(S.q-Math.max(-1,Math.min(1,dy/280)),p.sx,p.sy);},{passive:false});
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
+$('size').addEventListener('input',e=>{S.size=Number(e.target.value);$('sizeValue').textContent=S.size+' px';});
+$('plasmaToggle').addEventListener('change',e=>S.plasma=e.target.checked);$('grid').addEventListener('change',e=>S.grid=e.target.checked);
+$('zoomin').addEventListener('click',()=>setZoom(S.q+.5));$('zoomout').addEventListener('click',()=>setZoom(S.q-.5));
+$('reset').addEventListener('click',()=>{S.cx=zero;S.cy=zero;S.q=0;cameraChanged();});
+$('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);$('clear').addEventListener('click',clearDoc);
+$('new').addEventListener('click',()=>{if(S.dirty&&!confirm('Ungespeicherte Zeichnung verwerfen?'))return;
+ S.strokes=[];S.undo=[];S.redo=[];S.cx=zero;S.cy=zero;S.q=0;S.journal=[];S.nextId=1;S.dirty=false;S.docRevision++;S.camRevision++;clearBaseSnapshot();worker.postMessage({type:'load',strokes:[]});invalidateProjection();status();schedulePaint(0);});
+$('save').addEventListener('click',()=>{download(new Blob([serialize()],{type:'application/json'}),'nirin_infinidraw_2.json');S.dirty=false;status();});
+$('export').addEventListener('click',exportPNG);$('load').addEventListener('click',()=>$('file').click());$('file').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{loadText(await f.text());}catch(err){toast('Datei abgelehnt: '+err.message);console.error(err);}});
+window.addEventListener('beforeunload',e=>{if(S.dirty){e.preventDefault();e.returnValue='';}});
+window.__NIRIN__={S,view,worldAt,screenAt,setZoom,pan,addStroke,erase,undo,redo,loadText,serialize,draw:()=>schedulePaint(0),cameraOnly:()=>{},getRenderer:()=>R,getVisualJournal:()=>S.journal.slice(),getDraft:()=>draftGeometry(),getDeltaPixel:(x,y)=>R.deltaCtx?Array.from(R.deltaCtx.getImageData(x,y,1,1).data):null};
+new ResizeObserver(resize).observe(stage);resize();initWorker();status();requestAnimationFrame(frame);
+})();
+
+</script></body></html>
